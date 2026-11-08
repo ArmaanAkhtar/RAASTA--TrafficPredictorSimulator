@@ -3,15 +3,16 @@
 // No props: reads/writes the store only.
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Bar, BarChart, Cell, ResponsiveContainer, XAxis, YAxis } from 'recharts';
-import { LEVEL_COLOR, levelOf, predict } from '../../lib/api';
+import { findAltRoute, LEVEL_COLOR, levelOf, predict } from '../../lib/api';
 import type { RoadType, RushLevel, SelectedTime } from '../../lib/types';
 import { useAppStore } from '../../store/useAppStore';
 import { formatTime } from './TimePicker';
 
 const TYPE_LABEL: Record<RoadType, string> = { highway: 'Highway', arterial: 'Arterial road', local: 'Local road' };
 const LEVEL_LABEL: Record<RushLevel, string> = { light: 'Light', medium: 'Medium', heavy: 'Heavy' };
+const ROUTE_THRESHOLD = 60; // suggest a better route when jam chance is above this
 
 function addHours(t: SelectedTime, hours: number): SelectedTime {
   let hour = t.hour + hours;
@@ -23,17 +24,110 @@ function addHours(t: SelectedTime, hours: number): SelectedTime {
   return { day, hour, minute: 0 };
 }
 
+function jamColor(jam: number): string {
+  if (jam > ROUTE_THRESHOLD) return LEVEL_COLOR.heavy;
+  if (jam >= 30) return LEVEL_COLOR.medium;
+  return LEVEL_COLOR.light;
+}
+
+// ---------------------------------------------------------------------------
+// Better route card (M4)
+// ---------------------------------------------------------------------------
+function BetterRouteCard({ mainJam }: { mainJam: number }) {
+  const roads = useAppStore((s) => s.roads);
+  const altRoute = useAppStore((s) => s.altRoute);
+  const showRoute = useAppStore((s) => s.showRoute);
+  const setShowRoute = useAppStore((s) => s.setShowRoute);
+
+  if (mainJam <= ROUTE_THRESHOLD) {
+    return (
+      <div className="rounded-xl border border-white/5 bg-white/5 p-3 text-sm text-slate-400">
+        Jam chance is low, no detour needed.
+      </div>
+    );
+  }
+
+  if (!altRoute) {
+    return (
+      <div className="rounded-xl border border-white/5 bg-white/5 p-3 text-sm text-slate-400">
+        No better route found nearby. Try leaving a bit later.
+      </div>
+    );
+  }
+
+  const nameOf = new Map(roads.map((r) => [r.id, r.name]));
+  const named = altRoute.roadIds
+    .map((id) => nameOf.get(id) ?? '')
+    .filter((n) => n !== '' && !n.startsWith('Unnamed'));
+  const via = (named.length ? named : altRoute.roadIds.map((id) => nameOf.get(id) ?? id)).slice(0, 3);
+  const saved = altRoute.minutesSaved;
+
+  return (
+    <div className="rounded-xl border border-[#7cc4ff]/30 bg-[#7cc4ff]/10 p-3">
+      <div className="flex items-center gap-2">
+        <span className="h-1.5 w-5 rounded-full bg-[#7cc4ff]" />
+        <p className="text-sm font-semibold text-[#7cc4ff]">Better route</p>
+      </div>
+      <p className="mt-2 text-sm text-slate-200">via {via.join(' → ')}</p>
+
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <div>
+          <p className="text-xs text-slate-400">Jam chance</p>
+          <p className="text-xl font-bold tabular-nums" style={{ color: jamColor(altRoute.jamChance) }}>
+            {altRoute.jamChance}%
+          </p>
+          <p className="text-xs text-slate-500">vs {mainJam}% on this road</p>
+        </div>
+        <div>
+          <p className="text-xs text-slate-400">Time</p>
+          <p className="text-xl font-bold tabular-nums text-slate-100">
+            {saved > 0 ? `${saved} min` : saved <= -5 ? `+${-saved} min` : `${altRoute.minutes} min`}
+          </p>
+          <p className="text-xs text-slate-500">
+            {saved > 0 ? 'saved' : saved <= -5 ? 'longer, but less jam risk' : 'about the same time'} ·{' '}
+            {altRoute.distanceKm} km
+          </p>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setShowRoute(!showRoute)}
+        className={`mt-3 w-full rounded-lg py-2 text-sm font-semibold transition-colors ${
+          showRoute ? 'border border-[#7cc4ff]/40 text-[#7cc4ff] hover:bg-[#7cc4ff]/10' : 'bg-[#7cc4ff] text-[#0b1220] hover:opacity-90'
+        }`}
+      >
+        {showRoute ? 'Hide route' : 'Show route'}
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Side panel
+// ---------------------------------------------------------------------------
 export default function SidePanel() {
   const roads = useAppStore((s) => s.roads);
   const selectedRoadId = useAppStore((s) => s.selectedRoadId);
   const selectedTime = useAppStore((s) => s.selectedTime);
   const rain = useAppStore((s) => s.rain);
   const selectRoad = useAppStore((s) => s.selectRoad);
+  const setAltRoute = useAppStore((s) => s.setAltRoute);
 
   const [collapsed, setCollapsed] = useState(false); // mobile only
 
   const road = useMemo(() => roads.find((r) => r.id === selectedRoadId) ?? null, [roads, selectedRoadId]);
   const prediction = useMemo(() => (road ? predict(road, selectedTime, rain) : null), [road, selectedTime, rain]);
+  const needsRoute = prediction !== null && prediction.jamChanceNextHour > ROUTE_THRESHOLD;
+
+  // Compute the better route when the jam chance is high; clear it otherwise
+  useEffect(() => {
+    if (!road || !needsRoute) {
+      setAltRoute(null);
+      return;
+    }
+    setAltRoute(findAltRoute(roads, road.id, selectedTime, rain));
+  }, [road, needsRoute, roads, selectedTime, rain, setAltRoute]);
 
   // Next 4 whole hours (can roll over into the next day)
   const chartData = useMemo(() => {
@@ -48,7 +142,6 @@ export default function SidePanel() {
   if (!road || !prediction) return null;
 
   const jam = prediction.jamChanceNextHour;
-  const jamColor = jam > 60 ? LEVEL_COLOR.heavy : jam >= 30 ? LEVEL_COLOR.medium : LEVEL_COLOR.light;
 
   return (
     <aside
@@ -100,7 +193,7 @@ export default function SidePanel() {
           </div>
           <div className="rounded-xl bg-white/5 p-3">
             <p className="text-xs text-slate-400">Jam chance next hour</p>
-            <p className="mt-1 text-2xl font-bold tabular-nums" style={{ color: jamColor }}>
+            <p className="mt-1 text-2xl font-bold tabular-nums" style={{ color: jamColor(jam) }}>
               {jam}%
             </p>
             <p className="text-xs text-slate-400">
@@ -132,12 +225,8 @@ export default function SidePanel() {
           </div>
         </div>
 
-        {/* ================================================================
-            M4 SLOT: "Better route" card goes here.
-            Show it when prediction.jamChanceNextHour > 60:
-            findAltRoute -> setAltRoute -> route names, jam %, minutes saved,
-            and a "Show route" button (setShowRoute(true)).
-           ================================================================ */}
+        {/* Better route (M4) */}
+        <BetterRouteCard mainJam={jam} />
       </div>
     </aside>
   );
