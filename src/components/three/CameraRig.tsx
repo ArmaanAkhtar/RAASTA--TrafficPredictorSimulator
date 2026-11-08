@@ -88,6 +88,25 @@ export function CameraRig() {
     lastToken.current = flyToken;
     const box = roadBoundingBox([selectedRoad]);
     const view = framedView(camera, box.center, box.size);
+    if (typeof window !== 'undefined') {
+      if (window.innerWidth >= 768) {
+        const screenOffset = new THREE.Vector3(
+          Math.max(box.size.x, box.size.z) * 0.12,
+          0,
+          0,
+        );
+        view.target.add(screenOffset);
+        view.position.add(screenOffset);
+      } else {
+        const mobileOffset = new THREE.Vector3(
+          0,
+          0,
+          -Math.max(box.size.x, box.size.z) * 0.12,
+        );
+        view.target.add(mobileOffset);
+        view.position.add(mobileOffset);
+      }
+    }
     animation.current = {
       elapsed: 0,
       fromPosition: camera.position.clone(),

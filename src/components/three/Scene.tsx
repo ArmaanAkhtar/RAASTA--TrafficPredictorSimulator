@@ -7,10 +7,13 @@ import { Roads } from './Roads';
 import { Vehicles } from './Vehicles';
 import { useAppStore } from '@/store/useAppStore';
 import { CameraRig } from './CameraRig';
+import { Buildings } from './Buildings';
+import { Bloom, EffectComposer, Vignette } from '@react-three/postprocessing';
 
 export function Scene() {
   const selectRoad = useAppStore((state) => state.selectRoad);
   const roads = useAppStore((state) => state.roads);
+  const lowGraphics = useAppStore((state) => state.lowGraphics);
   const ground = useMemo(() => {
     if (roads.length === 0) return { centerX: 0, centerZ: 0, width: 50000, depth: 50000, margin: 5000 };
     let minX = Infinity;
@@ -43,16 +46,17 @@ export function Scene() {
 
   return (
     <Canvas
-      dpr={[1, 2]}
+      dpr={[1, 1.75]}
       camera={{ position: [0, 6000, 7000], fov: 45, near: 10, far: 100000 }}
       gl={{ antialias: true, logarithmicDepthBuffer: true }}
-      style={{ background: '#0b1220' }}
+      style={{ background: '#05080f' }}
       onPointerMissed={() => selectRoad(null)}
     >
-      <color attach="background" args={['#0b1220']} />
-      <fog attach="fog" args={['#0b1220', 20000, 80000]} />
-      <ambientLight intensity={0.65} />
-      <directionalLight position={[5000, 12000, 5000]} intensity={1.2} />
+      <color attach="background" args={['#05080f']} />
+      <fog attach="fog" args={['#05080f', 30000, 90000]} />
+      <hemisphereLight args={['#7cc4ff', '#05080f', 0.28]} />
+      <ambientLight intensity={0.18} />
+      <directionalLight position={[5000, 12000, 5000]} intensity={0.75} color="#ffd6a1" />
 
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
@@ -64,17 +68,17 @@ export function Scene() {
         }}
       >
         <planeGeometry args={[ground.width, ground.depth]} />
-        <meshStandardMaterial color="#101a2d" roughness={1} />
+        <meshStandardMaterial color="#070b16" roughness={1} metalness={0.05} />
       </mesh>
       <Grid
         position={[ground.centerX, -0.5, ground.centerZ]}
         args={[ground.width, ground.depth]}
         cellSize={500}
-        cellThickness={0.6}
-        cellColor="#1d3150"
+        cellThickness={0.35}
+        cellColor="#101a2d"
         sectionSize={2000}
-        sectionThickness={1.2}
-        sectionColor="#294469"
+        sectionThickness={0.55}
+        sectionColor="#16243a"
         fadeDistance={Math.max(ground.width, ground.depth) * 0.45}
         fadeStrength={1.5}
         infiniteGrid
@@ -82,6 +86,7 @@ export function Scene() {
 
       <Roads />
       <Vehicles />
+      <Buildings />
       <CameraRig />
 
       <MapControls
@@ -94,6 +99,12 @@ export function Scene() {
         enableDamping
         dampingFactor={0.08}
       />
+      {!lowGraphics && (
+        <EffectComposer multisampling={0}>
+          <Bloom mipmapBlur luminanceThreshold={0.2} luminanceSmoothing={0.2} intensity={1} />
+          <Vignette eskil={false} offset={0.12} darkness={0.55} />
+        </EffectComposer>
+      )}
     </Canvas>
   );
 }

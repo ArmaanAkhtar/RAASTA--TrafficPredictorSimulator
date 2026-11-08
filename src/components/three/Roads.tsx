@@ -1,9 +1,9 @@
 'use client';
 
 import { Html } from '@react-three/drei';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
-import type { ThreeEvent } from '@react-three/fiber';
+import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import { LEVEL_COLOR } from '@/lib/api';
 import type { Road, RushLevel } from '@/lib/types';
 import { useAppStore } from '@/store/useAppStore';
@@ -17,9 +17,65 @@ const ROAD_WIDTH: Record<Road['type'], number> = {
   local: 14 * VISUAL_WIDTH_SCALE,
 };
 
+const ROAD_HEIGHT: Record<Road['type'], number> = {
+  local: 2,
+  arterial: 3,
+  highway: 4,
+};
+
 interface RibbonGeometry {
   geometry: THREE.BufferGeometry;
   outlineGeometry: THREE.EdgesGeometry;
+}
+
+function LaneMarkings({ segments }: { segments: Road['segments'] }) {
+  const geometry = useMemo(() => {
+    const vertices: number[] = [];
+    segments.forEach((points) => {
+      const cleaned = points.filter((point, index) => {
+        if (index === 0) return true;
+        const previous = points[index - 1];
+        return Math.hypot(previous[0] - point[0], previous[1] - point[1]) > 0.001;
+      });
+      for (let index = 0; index < cleaned.length - 1; index += 1) {
+        const [ax, ay] = cleaned[index];
+        const [bx, by] = cleaned[index + 1];
+        const dx = bx - ax;
+        const dy = by - ay;
+        const length = Math.hypot(dx, dy);
+        if (length < 1) continue;
+        const dashLength = 90;
+        const gapLength = 70;
+        const nx = -dy / length;
+        const ny = dx / length;
+        const step = dashLength + gapLength;
+        for (let distance = 0; distance < length; distance += step) {
+          const start = THREE.MathUtils.clamp(distance, 0, length);
+          const end = THREE.MathUtils.clamp(distance + dashLength, 0, length);
+          const startX = ax + dx * (start / length);
+          const startY = ay + dy * (start / length);
+          const endX = ax + dx * (end / length);
+          const endY = ay + dy * (end / length);
+          [-1, 1].forEach((side) => {
+            vertices.push(
+              startX + nx * 18 * side, 1.1, -(startY + ny * 18 * side),
+              endX + nx * 18 * side, 1.1, -(endY + ny * 18 * side),
+            );
+          });
+        }
+      }
+    });
+    const result = new THREE.BufferGeometry();
+    result.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    return result;
+  }, [segments]);
+
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  return (
+    <lineSegments geometry={geometry} position={[0, 0.5, 0]}>
+      <lineBasicMaterial color="#d7dde8" transparent opacity={0.22} depthWrite={false} toneMapped={false} />
+    </lineSegments>
+  );
 }
 
 function buildRibbonGeometry(points: Road['segments'][number], width: number): RibbonGeometry {
@@ -101,37 +157,62 @@ function RoadRibbon({
   const filter = useAppStore((state) => state.filter);
   const selectRoad = useAppStore((state) => state.selectRoad);
   const [hovered, setHovered] = useState(false);
+  const groupRef = useRef<THREE.Group>(null);
+  const baseMaterials = useRef<THREE.MeshBasicMaterial[]>([]);
+  const coreMaterials = useRef<THREE.MeshBasicMaterial[]>([]);
+  const amberMaterials = useRef<THREE.MeshBasicMaterial[]>([]);
+  const selectionOpacity = useRef(1);
 
+  const baseWidth = ROAD_WIDTH[road.type] * 1.2;
+  const coreWidth = Math.max(9, ROAD_WIDTH[road.type] * 0.34);
   const ribbons = useMemo(
-    () => road.segments.map((points) => buildRibbonGeometry(points, ROAD_WIDTH[road.type])),
-    [road],
+    () => road.segments.map((points) => ({
+      base: buildRibbonGeometry(points, baseWidth),
+      core: buildRibbonGeometry(points, coreWidth),
+      amber: buildRibbonGeometry(points, baseWidth + 44),
+    })),
+    [road, baseWidth, coreWidth],
   );
 
   useEffect(() => () => {
-    ribbons.forEach(({ geometry, outlineGeometry }) => {
-      geometry.dispose();
-      outlineGeometry.dispose();
+    ribbons.forEach(({ base, core, amber }) => {
+      base.geometry.dispose();
+      base.outlineGeometry.dispose();
+      core.geometry.dispose();
+      core.outlineGeometry.dispose();
+      amber.geometry.dispose();
+      amber.outlineGeometry.dispose();
     });
   }, [ribbons]);
-
-  useEffect(() => {
-    if (!hovered) return;
-    return () => {
-      document.body.style.cursor = '';
-    };
-  }, [hovered]);
 
   const selected = selectedRoadId === road.id;
   const level = predictionLevel ?? 'light';
   const visible = filter[level];
   const baseColor = LEVEL_COLOR[level];
-  const displayColor = useMemo(() => {
-    const color = new THREE.Color(baseColor);
-    if (selected) return color;
-    if (hovered) color.offsetHSL(0, -0.05, 0.16);
-    else color.multiplyScalar(0.72);
-    return `#${color.getHexString()}`;
-  }, [baseColor, hovered, selected]);
+  const roadHeight = ROAD_HEIGHT[road.type] + (selected ? 2 : 0);
+
+  useEffect(() => {
+    selectionOpacity.current = selectedRoadId === null ? 1 : selected ? 1 : 0.35;
+  }, [selected, selectedRoadId]);
+
+  useFrame((state, delta) => {
+    const targetOpacity = selectedRoadId === null ? (visible ? 1 : 0.12) : selected ? (visible ? 1 : 0.12) : 0.35 * (visible ? 1 : 0.12);
+    selectionOpacity.current = THREE.MathUtils.damp(selectionOpacity.current, targetOpacity, 4, delta);
+    baseMaterials.current.forEach((material) => {
+      material.opacity = THREE.MathUtils.damp(material.opacity, selectionOpacity.current * 0.82, 6, delta);
+    });
+    coreMaterials.current.forEach((material) => {
+      const pulse = level === 'heavy'
+        ? 0.82 + Math.sin(state.clock.elapsedTime * 2.4 + road.id.length) * 0.18
+        : level === 'medium'
+          ? 0.7 + Math.sin(state.clock.elapsedTime * 1.2 + road.id.length) * 0.08
+          : 0.58;
+      material.opacity = THREE.MathUtils.damp(material.opacity, selectionOpacity.current * pulse, 7, delta);
+    });
+    amberMaterials.current.forEach((material) => {
+      material.opacity = THREE.MathUtils.damp(material.opacity, selected ? 0.7 : 0, 7, delta);
+    });
+  });
 
   const handleClick = (event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation();
@@ -151,34 +232,72 @@ function RoadRibbon({
   };
 
   return (
-    <group position={[0, 2, 0]}>
-      {ribbons.map(({ geometry, outlineGeometry }, index) => (
+    <group ref={groupRef} position={[0, roadHeight, 0]}>
+      {ribbons.map(({ base, core, amber }, index) => (
         <group key={`${road.id}-${index}`}>
+          <mesh geometry={amber.geometry} renderOrder={-1}>
+            <meshBasicMaterial
+              ref={(material: THREE.MeshBasicMaterial | null) => {
+                if (material) amberMaterials.current[index] = material;
+              }}
+              color="#ffb547"
+              transparent
+              opacity={0}
+              depthWrite={false}
+              toneMapped={false}
+              polygonOffset
+              polygonOffsetFactor={-5}
+              polygonOffsetUnits={-5}
+            />
+          </mesh>
           <mesh
-            geometry={geometry}
+            geometry={base.geometry}
+            position={[0, 0, 0]}
             onClick={handleClick}
             onPointerOver={handlePointerOver}
             onPointerOut={handlePointerOut}
+            renderOrder={2}
           >
             <meshBasicMaterial
-              color={displayColor}
+              ref={(material: THREE.MeshBasicMaterial | null) => {
+                if (material) baseMaterials.current[index] = material;
+              }}
+              color="#141b2d"
               fog={false}
-              toneMapped={false}
-              transparent={!visible}
-              opacity={visible ? 1 : 0.12}
+              transparent
+              opacity={visible ? 0.82 : 0.12}
               depthWrite
               polygonOffset
-              polygonOffsetFactor={-1}
-              polygonOffsetUnits={-1}
+              polygonOffsetFactor={-3}
+              polygonOffsetUnits={-3}
             />
           </mesh>
-          {selected && (
-            <lineSegments geometry={outlineGeometry}>
-              <lineBasicMaterial color="#ffb547" toneMapped={false} />
-            </lineSegments>
-          )}
+          <mesh
+            geometry={core.geometry}
+            position={[0, 0.5, 0]}
+            onClick={handleClick}
+            renderOrder={3}
+          >
+            <meshBasicMaterial
+              ref={(material: THREE.MeshBasicMaterial | null) => {
+                if (material) coreMaterials.current[index] = material;
+              }}
+              color={hovered ? '#ffb547' : baseColor}
+              fog={false}
+              toneMapped={false}
+              transparent
+              opacity={visible ? 0.58 : 0.08}
+              depthWrite={false}
+              polygonOffset
+              polygonOffsetFactor={-6}
+              polygonOffsetUnits={-6}
+            />
+          </mesh>
         </group>
       ))}
+      {(road.type === 'highway' || road.type === 'arterial') && (
+        <LaneMarkings segments={road.segments} />
+      )}
       {selected && (
         <Html
           position={[road.center[0], 180, -road.center[1]]}

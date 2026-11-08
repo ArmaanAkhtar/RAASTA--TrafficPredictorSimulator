@@ -9,6 +9,7 @@ import TimePicker from '@/components/ui/TimePicker';
 import FilterBar from '@/components/ui/FilterBar';
 import Legend from '@/components/ui/Legend';
 import SidePanel from '@/components/ui/SidePanel';
+import { DevControls } from '@/components/three/DevControls';
 
 const Scene = dynamic(
   () => import('@/components/three/Scene').then((module) => module.Scene),
@@ -52,6 +53,7 @@ export default function Home() {
         </div>
 
         <SidePanel />
+        <DevControls />
       </div>
     </main>
   );
