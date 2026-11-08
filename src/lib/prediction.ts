@@ -35,8 +35,8 @@ export const CONFIG = {
   jitterScaleForNamedRoads: 0.5,
 
   // Jam chance = 100 / (1 + exp(-(score - jamCenter) / jamWidth))
-  jamCenter: 80,
-  jamWidth: 8,
+  jamCenter: 75,
+  jamWidth: 10,
 };
 
 export const LEVEL_COLOR: Record<RushLevel, string> = {
