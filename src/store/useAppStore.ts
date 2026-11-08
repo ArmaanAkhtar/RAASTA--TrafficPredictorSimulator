@@ -21,12 +21,11 @@ interface AppState {
   openCamera: (id: string | null) => void;
 }
 
-const now = new Date();
 
 export const useAppStore = create<AppState>((set) => ({
   roads: [],
   selectedRoadId: null,
-  selectedTime: { day: now.getDay(), hour: now.getHours(), minute: now.getMinutes() },
+  selectedTime: { day: 3, hour: 16, minute: 0 }, // Wed 4:00 PM fixed default (avoids hydration mismatch)
   rain: false,
   filter: { light: true, medium: true, heavy: true },
   altRoute: null,
