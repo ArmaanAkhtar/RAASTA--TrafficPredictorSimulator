@@ -5,6 +5,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { Road } from '@/lib/types';
 import { useAppStore } from '@/store/useAppStore';
+import { useDaylight } from './useDaylight';
 
 function hash01(seed: number): number {
   let value = seed | 0;
@@ -80,9 +81,10 @@ function nearestRoadDistance(
 export function Buildings() {
   const roads = useAppStore((state) => state.roads);
   const selectedRoadId = useAppStore((state) => state.selectedRoadId);
-  const lowGraphics = useAppStore((state) => state.lowGraphics);
   const meshRef = useRef<THREE.InstancedMesh>(null);
+  const rimRef = useRef<THREE.InstancedMesh>(null);
   const targetOpacity = useRef(1);
+  const daylight = useDaylight();
 
   const { positions, texture } = useMemo(() => {
     const windowTexture = makeWindowTexture();
@@ -137,11 +139,13 @@ export function Buildings() {
     let seed = 1337;
     let attempts = 0;
 
-    while (result.length < 6500 && attempts < 90000) {
+    while (result.length < 3500 && attempts < 120000) {
       attempts += 1;
       seed += 97;
-      const x = minX + hash01(seed) * (maxX - minX);
-      const z = -(minY + hash01(seed + 1) * (maxY - minY));
+      let x = minX + hash01(seed) * (maxX - minX);
+      let z = -(minY + hash01(seed + 1) * (maxY - minY));
+      x = Math.round(x / 140) * 140 + (hash01(seed + 7) - 0.5) * 45;
+      z = Math.round(z / 140) * 140 + (hash01(seed + 8) - 0.5) * 45;
       const nearest = nearestRoadDistance(x, z, grid, cellSize);
       if (nearest.distance < 60 || nearest.distance > 300) continue;
 
@@ -151,20 +155,22 @@ export function Buildings() {
       const cityDistance = Math.hypot(x - centerX, z - centerZ) / Math.max(citySize, 1);
       const centreBoost = 1 - THREE.MathUtils.clamp(cityDistance * 1.35, 0, 1);
       const highwayBoost = nearest.highwayNearby ? 0.25 : 0;
-      const randomHeight = 15 + hash01(seed + 2) * 145;
+      const randomHeight = 20 + hash01(seed + 2) * 200;
       const height = THREE.MathUtils.clamp(
         randomHeight * (0.45 + centreBoost * 0.75 + highwayBoost),
-        15,
-        160,
+        20,
+        220,
       );
-      const width = 24 + hash01(seed + 3) * 36;
-      const depth = 24 + hash01(seed + 4) * 36;
+      const landmark = hash01(seed + 5) < 0.018 && centreBoost > 0.55;
+      const finalHeight = landmark ? 300 + hash01(seed + 6) * 100 : height;
+      const width = 30 + hash01(seed + 3) * 50;
+      const depth = 30 + hash01(seed + 4) * 50;
       const dummy = new THREE.Object3D();
-      dummy.position.set(x, height * 0.5, z);
-      dummy.scale.set(width, height, depth);
+      dummy.position.set(x, finalHeight * 0.5, z);
+      dummy.scale.set(width, finalHeight, depth);
       dummy.updateMatrix();
       const entry = dummy as THREE.Object3D & { userData: { height: number } };
-      entry.userData.height = height;
+      entry.userData.height = finalHeight;
       result.push(entry);
     }
     return { positions: result, texture: windowTexture };
@@ -177,11 +183,32 @@ export function Buildings() {
   useLayoutEffect(() => {
     const mesh = meshRef.current;
     if (!mesh) return;
+    const palette = ['#1c2438', '#222b42', '#2a3350', '#1a2133'];
     positions.forEach((building, index) => {
       mesh.setMatrixAt(index, building.matrix);
+      const colourIndex = Math.floor(hash01(index * 101 + 17) * palette.length);
+      mesh.setColorAt(index, new THREE.Color(palette[colourIndex]));
+      const rim = rimRef.current;
+      if (rim) {
+        const rimMatrix = new THREE.Matrix4();
+        const height = building.scale.y;
+        const width = building.scale.x + 1.8;
+        const depth = building.scale.z + 1.8;
+        rimMatrix.compose(
+          new THREE.Vector3(building.position.x, height + 0.8, building.position.z),
+          new THREE.Quaternion(),
+          new THREE.Vector3(width, 1.6, depth),
+        );
+        rim.setMatrixAt(index, rimMatrix);
+      }
     });
     mesh.count = positions.length;
     mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    if (rimRef.current) {
+      rimRef.current.count = positions.length;
+      rimRef.current.instanceMatrix.needsUpdate = true;
+    }
   }, [positions]);
 
   useEffect(() => {
@@ -190,26 +217,49 @@ export function Buildings() {
 
   useFrame((_, delta) => {
     const mesh = meshRef.current;
-    if (!mesh) return;
+    if (mesh) {
     const material = mesh.material as THREE.MeshStandardMaterial;
     material.opacity = THREE.MathUtils.damp(material.opacity, targetOpacity.current, 4, delta);
+    material.emissiveIntensity = THREE.MathUtils.damp(material.emissiveIntensity, daylight.darkness * 3.2, 5, delta);
+    }
+    const rim = rimRef.current;
+    if (rim) {
+      const rimMaterial = rim.material as THREE.MeshStandardMaterial;
+      rimMaterial.emissiveIntensity = THREE.MathUtils.damp(
+        rimMaterial.emissiveIntensity,
+        daylight.darkness * 0.24,
+        5,
+        delta,
+      );
+    }
   });
 
-  if (lowGraphics) return null;
-
   return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, 6500]} frustumCulled>
-      <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial
-        color="#0c1222"
-        emissive="#182238"
-        emissiveMap={texture}
-        emissiveIntensity={0.55}
-        roughness={0.9}
-        metalness={0.05}
-        transparent
-        opacity={1}
-      />
-    </instancedMesh>
+    <group>
+      <instancedMesh
+        ref={meshRef}
+        args={[undefined, undefined, 3500]}
+        castShadow={false}
+        receiveShadow={false}
+        frustumCulled
+      >
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial
+          vertexColors
+          color="#ffffff"
+          emissive="#f4b95f"
+          emissiveMap={texture}
+          emissiveIntensity={0}
+          roughness={0.82}
+          metalness={0.04}
+          transparent
+          opacity={1}
+        />
+      </instancedMesh>
+      <instancedMesh ref={rimRef} args={[undefined, undefined, 3500]} castShadow={false} frustumCulled>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="#3a4766" emissive="#3a4766" emissiveIntensity={0.35 + daylight.darkness * 0.18} roughness={0.8} />
+      </instancedMesh>
+    </group>
   );
 }

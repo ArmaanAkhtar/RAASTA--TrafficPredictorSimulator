@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import type { Road } from '@/lib/types';
 import { useAppStore } from '@/store/useAppStore';
 import { usePredictions } from './usePredictions';
+import { useDaylight } from './useDaylight';
 
 const VEHICLE_SCALE = 3;
 
@@ -224,6 +225,7 @@ export function Vehicles() {
   const rain = useAppStore((state) => state.rain);
   const filter = useAppStore((state) => state.filter);
   const selectedRoadId = useAppStore((state) => state.selectedRoadId);
+  const daylight = useDaylight();
   const predictions = usePredictions(roads, selectedTime, rain);
   const { camera } = useThree();
   const bodyRefs = useRef<Record<VehicleType, THREE.InstancedMesh | null>>({
@@ -231,6 +233,8 @@ export function Vehicles() {
   });
   const headRef = useRef<THREE.InstancedMesh>(null);
   const tailRef = useRef<THREE.InstancedMesh>(null);
+  const headMaterialRef = useRef<THREE.MeshBasicMaterial>(null);
+  const tailMaterialRef = useRef<THREE.MeshBasicMaterial>(null);
   const headCountRef = useRef(0);
   const tailCountRef = useRef(0);
   const dummy = useMemo(() => new THREE.Object3D(), []);
@@ -522,6 +526,22 @@ export function Vehicles() {
       tailRef.current.count = tailIndex;
       tailRef.current.instanceMatrix.needsUpdate = true;
     }
+    if (headMaterialRef.current) {
+      headMaterialRef.current.opacity = THREE.MathUtils.damp(
+        headMaterialRef.current.opacity,
+        daylight.darkness,
+        5,
+        delta,
+      );
+    }
+    if (tailMaterialRef.current) {
+      tailMaterialRef.current.opacity = THREE.MathUtils.damp(
+        tailMaterialRef.current.opacity,
+        daylight.darkness,
+        5,
+        delta,
+      );
+    }
 
     (Object.keys(bodyRefs.current) as VehicleType[]).forEach((type) => {
       const mesh = bodyRefs.current[type];
@@ -549,7 +569,7 @@ export function Vehicles() {
           key={type}
           ref={(mesh) => { bodyRefs.current[type] = mesh; }}
           args={[geometries[type], undefined, 4000]}
-          castShadow
+          castShadow={false}
           frustumCulled={false}
         >
           <meshStandardMaterial
@@ -567,17 +587,21 @@ export function Vehicles() {
       <instancedMesh ref={headRef} args={[undefined, undefined, 8000]} frustumCulled={false}>
         <sphereGeometry args={[5, 6, 4]} />
         <meshBasicMaterial
+          ref={headMaterialRef}
           color={headlights}
           toneMapped={false}
           transparent
+          opacity={0}
         />
       </instancedMesh>
       <instancedMesh ref={tailRef} args={[undefined, undefined, 8000]} frustumCulled={false}>
         <sphereGeometry args={[4.5, 6, 4]} />
         <meshBasicMaterial
+          ref={tailMaterialRef}
           color={taillights}
           toneMapped={false}
           transparent
+          opacity={0}
         />
       </instancedMesh>
     </group>

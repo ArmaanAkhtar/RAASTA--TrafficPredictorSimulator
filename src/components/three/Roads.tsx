@@ -8,8 +8,11 @@ import { LEVEL_COLOR } from '@/lib/api';
 import type { Road, RushLevel } from '@/lib/types';
 import { useAppStore } from '@/store/useAppStore';
 import { usePredictions } from './usePredictions';
+import { useDaylight } from './useDaylight';
 
 const VISUAL_WIDTH_SCALE = 4;
+const DAY_ASPHALT = new THREE.Color('#5a5f6a');
+const NIGHT_ASPHALT = new THREE.Color('#141b2d');
 
 const ROAD_WIDTH: Record<Road['type'], number> = {
   highway: 40 * VISUAL_WIDTH_SCALE,
@@ -154,6 +157,7 @@ function RoadRibbon({
   predictionLevel?: RushLevel;
 }) {
   const selectedRoadId = useAppStore((state) => state.selectedRoadId);
+  const daylight = useDaylight();
   const filter = useAppStore((state) => state.filter);
   const selectRoad = useAppStore((state) => state.selectRoad);
   const [hovered, setHovered] = useState(false);
@@ -198,8 +202,10 @@ function RoadRibbon({
   useFrame((state, delta) => {
     const targetOpacity = selectedRoadId === null ? (visible ? 1 : 0.12) : selected ? (visible ? 1 : 0.12) : 0.35 * (visible ? 1 : 0.12);
     selectionOpacity.current = THREE.MathUtils.damp(selectionOpacity.current, targetOpacity, 4, delta);
+    const darkness = daylight.darkness;
     baseMaterials.current.forEach((material) => {
       material.opacity = THREE.MathUtils.damp(material.opacity, selectionOpacity.current * 0.82, 6, delta);
+      material.color.copy(DAY_ASPHALT).lerp(NIGHT_ASPHALT, darkness);
     });
     coreMaterials.current.forEach((material) => {
       const pulse = level === 'heavy'
@@ -208,6 +214,12 @@ function RoadRibbon({
           ? 0.7 + Math.sin(state.clock.elapsedTime * 1.2 + road.id.length) * 0.08
           : 0.58;
       material.opacity = THREE.MathUtils.damp(material.opacity, selectionOpacity.current * pulse, 7, delta);
+      material.opacity = THREE.MathUtils.damp(
+        material.opacity,
+        selectionOpacity.current * (0.58 - darkness * 0.12 + (darkness > 0.15 ? pulse * 0.42 : 0)),
+        7,
+        delta,
+      );
     });
     amberMaterials.current.forEach((material) => {
       material.opacity = THREE.MathUtils.damp(material.opacity, selected ? 0.7 : 0, 7, delta);
