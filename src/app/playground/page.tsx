@@ -1,19 +1,23 @@
 // src/app/playground/page.tsx
-// Test page: draws the real Karachi roads on a 2D canvas (no 3D needed).
+// Test page for all UI components, without the 3D scene.
+// Roads are drawn on a 2D canvas, coloured by predicted rush, so the time picker,
+// filters, search and side panel can all be checked here.
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { loadRoads } from '../../lib/roads';
-import type { Road, RoadType } from '../../lib/types';
+import FilterBar from '../../components/ui/FilterBar';
+import Legend from '../../components/ui/Legend';
+import SearchBar from '../../components/ui/SearchBar';
+import SidePanel from '../../components/ui/SidePanel';
+import TimePicker from '../../components/ui/TimePicker';
+import { LEVEL_COLOR, predict } from '../../lib/api';
+import { loadRoads } from '../../lib/roads'; // real data directly, even before api.ts is switched
+import type { Road, RoadType, RushLevel } from '../../lib/types';
+import { useAppStore } from '../../store/useAppStore';
 
-const TYPE_STYLE: Record<RoadType, { color: string; width: number; label: string }> = {
-  highway: { color: '#ffb547', width: 2.5, label: 'Highway' },
-  arterial: { color: '#7cc4ff', width: 1.6, label: 'Arterial' },
-  local: { color: '#5b6b84', width: 1, label: 'Local' },
-};
-const DRAW_ORDER: RoadType[] = ['local', 'arterial', 'highway'];
-const SELECTED_COLOR = '#e5484d';
 const BG = '#0b1220';
+const WIDTH: Record<RoadType, number> = { highway: 2.6, arterial: 1.7, local: 1.1 };
+const DRAW_ORDER: RoadType[] = ['local', 'arterial', 'highway'];
 
 interface Bounds {
   minX: number;
@@ -39,18 +43,21 @@ function getBounds(roads: Road[]): Bounds | null {
 }
 
 export default function PlaygroundPage() {
-  const [roads, setRoads] = useState<Road[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [size, setSize] = useState({ w: 0, h: 0 });
+  const roads = useAppStore((s) => s.roads);
+  const setRoads = useAppStore((s) => s.setRoads);
+  const selectedRoadId = useAppStore((s) => s.selectedRoadId);
+  const selectedTime = useAppStore((s) => s.selectedTime);
+  const rain = useAppStore((s) => s.rain);
+  const filter = useAppStore((s) => s.filter);
 
+  const [error, setError] = useState<string | null>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Load roads once
+  // Load roads into the store once
   useEffect(() => {
+    if (roads.length > 0) return;
     let alive = true;
     loadRoads()
       .then((r) => {
@@ -58,16 +65,13 @@ export default function PlaygroundPage() {
       })
       .catch((e: unknown) => {
         if (alive) setError(e instanceof Error ? e.message : String(e));
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
       });
     return () => {
       alive = false;
     };
-  }, []);
+  }, [roads.length, setRoads]);
 
-  // Track canvas container size
+  // Track canvas size
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
@@ -80,12 +84,13 @@ export default function PlaygroundPage() {
   }, []);
 
   const bounds = useMemo(() => getBounds(roads), [roads]);
-  const sorted = useMemo(() => [...roads].sort((a, b) => b.lengthM - a.lengthM), [roads]);
-  const totalKm = useMemo(() => roads.reduce((s, r) => s + r.lengthM, 0) / 1000, [roads]);
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return q ? sorted.filter((r) => r.name.toLowerCase().includes(q)) : sorted;
-  }, [sorted, query]);
+
+  // Predicted level for every road at the selected time
+  const levels = useMemo(() => {
+    const m = new Map<string, RushLevel>();
+    for (const r of roads) m.set(r.id, predict(r, selectedTime, rain).nowLevel);
+    return m;
+  }, [roads, selectedTime, rain]);
 
   // Draw
   useEffect(() => {
@@ -101,7 +106,7 @@ export default function PlaygroundPage() {
     ctx.fillRect(0, 0, size.w, size.h);
     if (!bounds) return;
 
-    const pad = 20;
+    const pad = 24;
     const bw = bounds.maxX - bounds.minX || 1;
     const bh = bounds.maxY - bounds.minY || 1;
     const scale = Math.min((size.w - 2 * pad) / bw, (size.h - 2 * pad) / bh);
@@ -112,7 +117,6 @@ export default function PlaygroundPage() {
 
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-
     const drawRoad = (road: Road, color: string, width: number) => {
       ctx.strokeStyle = color;
       ctx.lineWidth = width;
@@ -128,90 +132,49 @@ export default function PlaygroundPage() {
 
     for (const t of DRAW_ORDER) {
       for (const r of roads) {
-        if (r.type === t && r.id !== selectedId) drawRoad(r, TYPE_STYLE[t].color, TYPE_STYLE[t].width);
+        if (r.type !== t || r.id === selectedRoadId) continue;
+        const level = levels.get(r.id) ?? 'light';
+        if (filter[level]) drawRoad(r, LEVEL_COLOR[level], WIDTH[t]);
+        else drawRoad(r, '#1e293b', 0.8); // filtered out: faint
       }
     }
 
-    const selected = roads.find((r) => r.id === selectedId);
+    const selected = roads.find((r) => r.id === selectedRoadId);
     if (selected) {
-      drawRoad(selected, SELECTED_COLOR, 4);
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(toX(selected.center[0]), toY(selected.center[1]), 4, 0, Math.PI * 2);
-      ctx.fill();
+      drawRoad(selected, '#ffffff', WIDTH[selected.type] + 4);
+      drawRoad(selected, LEVEL_COLOR[levels.get(selected.id) ?? 'light'], WIDTH[selected.type] + 1.5);
     }
-  }, [roads, bounds, size, selectedId]);
-
-  const selectedRoad = roads.find((r) => r.id === selectedId) ?? null;
+  }, [roads, bounds, size, levels, filter, selectedRoadId]);
 
   return (
-    <main className="flex min-h-screen flex-col bg-[#0b1220] text-slate-100 md:h-screen md:flex-row">
-      <div ref={wrapRef} className="relative h-[60vh] flex-1 md:h-auto">
+    <main className="relative h-screen w-full overflow-hidden bg-[#0b1220] text-slate-100">
+      <div ref={wrapRef} className="absolute inset-0">
         <canvas ref={canvasRef} className="block h-full w-full" />
-        {loading && (
-          <div className="absolute inset-0 flex items-center justify-center text-sm text-slate-400">
-            Loading roads...
-          </div>
-        )}
-        {error && (
-          <div className="absolute inset-x-4 top-4 rounded-lg border border-red-500/40 bg-red-950/80 p-3 text-sm text-red-200">
-            {error}
-          </div>
-        )}
-        <div className="absolute bottom-3 left-3 flex gap-3 rounded-lg bg-black/40 px-3 py-2 text-xs backdrop-blur">
-          {DRAW_ORDER.slice()
-            .reverse()
-            .map((t) => (
-              <span key={t} className="flex items-center gap-1.5">
-                <span className="inline-block h-1 w-4 rounded" style={{ backgroundColor: TYPE_STYLE[t].color }} />
-                {TYPE_STYLE[t].label}
-              </span>
-            ))}
-        </div>
       </div>
 
-      <aside className="flex w-full flex-col border-t border-white/10 md:w-80 md:border-l md:border-t-0">
-        <div className="space-y-1 border-b border-white/10 p-4">
-          <h1 className="text-lg font-semibold text-[#ffb547]">Roads playground</h1>
-          <p className="text-sm text-slate-300">
-            {roads.length} roads · {totalKm.toFixed(1)} km
-          </p>
-          {selectedRoad && (
-            <p className="text-sm text-slate-300">
-              Selected: <span className="text-[#e5484d]">{selectedRoad.name}</span> ·{' '}
-              {(selectedRoad.lengthM / 1000).toFixed(1)} km · {selectedRoad.segments.length} segments
-            </p>
-          )}
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Filter by name..."
-            className="mt-2 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-[#ffb547]"
-          />
+      {/* Top-left controls */}
+      <div className="absolute left-4 right-4 top-4 z-20 flex flex-col gap-3 sm:right-auto sm:w-[360px]">
+        <div className="flex items-center gap-2">
+          <h1 className="text-sm font-semibold text-[#ffb547]">Karachi Traffic · UI playground</h1>
+          <span className="text-xs text-slate-500">{roads.length} roads</span>
         </div>
-        <ul className="max-h-[40vh] flex-1 overflow-y-auto md:max-h-none">
-          {filtered.map((r) => (
-            <li key={r.id}>
-              <button
-                type="button"
-                onClick={() => setSelectedId((cur) => (cur === r.id ? null : r.id))}
-                className={`flex w-full items-center justify-between gap-2 px-4 py-2 text-left text-sm hover:bg-white/5 ${
-                  r.id === selectedId ? 'bg-white/10' : ''
-                }`}
-              >
-                <span className="flex min-w-0 items-center gap-2">
-                  <span
-                    className="inline-block h-2 w-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: TYPE_STYLE[r.type].color }}
-                  />
-                  <span className="truncate">{r.name}</span>
-                </span>
-                <span className="shrink-0 text-xs text-slate-400">{(r.lengthM / 1000).toFixed(1)} km</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </aside>
+        <SearchBar />
+        <TimePicker />
+        <FilterBar />
+      </div>
+
+      {/* Bottom-left legend (hidden on small phones so the bottom sheet has room) */}
+      <div className="absolute bottom-4 left-4 z-10 hidden sm:block">
+        <Legend />
+      </div>
+
+      <SidePanel />
+
+      {error && (
+        <div className="absolute inset-x-4 bottom-4 z-40 rounded-lg border border-red-500/40 bg-red-950/90 p-3 text-sm text-red-200 sm:left-auto sm:w-96">
+          {error}
+        </div>
+      )}
     </main>
   );
 }
