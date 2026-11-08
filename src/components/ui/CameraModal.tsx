@@ -72,7 +72,7 @@ export default function CameraModal() {
                 {road.name}
                 {level && (
                   <>
-                    <span>·</span>
+                    <span>Â·</span>
                     <span className="h-2 w-2 rounded-full" style={{ backgroundColor: LEVEL_COLOR[level] }} />
                     {LEVEL_LABEL[level]} rush predicted
                   </>
@@ -81,7 +81,7 @@ export default function CameraModal() {
             )}
           </div>
           <span className="rounded-full border border-[#ffb547]/40 bg-[#ffb547]/15 px-2.5 py-1 text-xs font-medium text-[#ffb547]">
-            Sample feed
+            Sample feed (Preview)
           </span>
           <button
             type="button"
@@ -116,7 +116,7 @@ export default function CameraModal() {
         </div>
 
         <p className="px-4 py-2 text-xs text-slate-500">
-          Recorded sample clip for the prototype, not a live stream. Press Esc to close.
+          Preview of a planned feature: this is a recorded clip, not a live stream. With access to city traffic cameras (e.g. Karachi Safe City), this view would show the road live, so you can check traffic from home before you leave. Press Esc to close.
         </p>
       </div>
     </div>
