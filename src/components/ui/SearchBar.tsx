@@ -5,6 +5,10 @@
 import Fuse from 'fuse.js';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { LEVEL_COLOR, predict } from '../../lib/api';
+import { useAreaStore } from '../../lib/area';
+import { CAT_ICON, PLACE_KIND_LABEL, type Place } from '../../lib/places';
+import { useAllPlaces } from '../../lib/osmPlaces';
+import { useTripStore } from '../../lib/trip';
 import type { Road, RoadType } from '../../lib/types';
 import { useAppStore } from '../../store/useAppStore';
 
@@ -15,10 +19,19 @@ const GLASS = 'rounded-2xl border border-white/10 bg-[#0b1220]/75 shadow-xl back
 /** "Shahrah-e-Faisal" -> "shahrahefaisal", "shahra faisal" -> "shahrafaisal" (so they match closely). */
 const normalise = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
+/** A search result: a road, or an area / landmark (shows the cameras around it). */
+type Hit = { kind: 'road'; road: Road } | { kind: 'place'; place: Place };
+
 interface SearchItem {
-  road: Road;
+  hit: Hit;
   key: string;
+  alt: string;
 }
+
+const hitId = (h: Hit) => (h.kind === 'road' ? h.road.id : h.place.id);
+/** "Block 13-D, Gulshan-e-Iqbal" can also be found as "gulshan block 13" */
+const altKey = (name: string) => normalise(name.split(',').reverse().join(' '));
+const hitName = (h: Hit) => (h.kind === 'road' ? h.road.name : h.place.name);
 
 export default function SearchBar() {
   const roads = useAppStore((s) => s.roads);
@@ -31,19 +44,23 @@ export default function SearchBar() {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
 
+  const places = useAllPlaces();
   const fuse = useMemo(
     () =>
       new Fuse<SearchItem>(
-        roads.map((road) => ({ road, key: normalise(road.name) })),
-        { keys: ['key'], threshold: 0.35, ignoreLocation: true },
+        [
+          ...places.map((place) => ({ hit: { kind: 'place' as const, place }, key: normalise(place.name), alt: altKey(place.name) })),
+          ...roads.map((road) => ({ hit: { kind: 'road' as const, road }, key: normalise(road.name), alt: '' })),
+        ],
+        { keys: ['key', 'alt'], threshold: 0.35, ignoreLocation: true },
       ),
-    [roads],
+    [roads, places],
   );
 
   const results = useMemo(() => {
     const q = normalise(query);
     if (!q) return [];
-    return fuse.search(q, { limit: MAX_RESULTS }).map((r) => r.item.road);
+    return fuse.search(q, { limit: MAX_RESULTS }).map((r) => r.item.hit);
   }, [fuse, query]);
 
   // "/" anywhere on the page focuses the search box
@@ -59,9 +76,17 @@ export default function SearchBar() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const choose = (road: Road) => {
-    selectRoad(road.id);
-    setQuery(road.name);
+  const choose = (hit: Hit) => {
+    if (hit.kind === 'road') {
+      useAreaStore.getState().setPlace(null);
+      selectRoad(hit.road.id);
+    } else {
+      // Area / landmark: fly there and list its cameras; it replaces a road or trip on the right
+      if (useAppStore.getState().selectedRoadId !== null) selectRoad(null);
+      useTripStore.getState().setActive(false);
+      useAreaStore.getState().setPlace(hit.place);
+    }
+    setQuery(hitName(hit));
     setOpen(false);
     inputRef.current?.blur();
   };
@@ -75,10 +100,10 @@ export default function SearchBar() {
       e.preventDefault();
       setActive((i) => (results.length ? (i - 1 + results.length) % results.length : 0));
     } else if (e.key === 'Enter') {
-      const road = results[active];
-      if (road) {
+      const hit = results[active];
+      if (hit) {
         e.preventDefault();
-        choose(road);
+        choose(hit);
       }
     } else if (e.key === 'Escape') {
       if (open && query) {
@@ -110,7 +135,7 @@ export default function SearchBar() {
           onFocus={() => setOpen(true)}
           onBlur={() => setOpen(false)}
           onKeyDown={onKeyDown}
-          placeholder="Search a road, e.g. Shahrah-e-Faisal"
+          placeholder="Search a road or area, e.g. Clifton"
           className="w-full bg-transparent text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
           role="combobox"
           aria-expanded={showDropdown}
@@ -137,24 +162,35 @@ export default function SearchBar() {
 
       {showDropdown && (
         <ul id="road-search-results" role="listbox" className={`${GLASS} absolute inset-x-0 top-full z-40 mt-2 overflow-hidden py-1`}>
-          {results.length === 0 && <li className="px-4 py-3 text-sm text-slate-400">No roads found</li>}
-          {results.map((road, i) => {
-            const level = predict(road, selectedTime, rain).nowLevel;
+          {results.length === 0 && <li className="px-4 py-3 text-sm text-slate-400">No roads or places found</li>}
+          {results.map((hit, i) => {
+            const id = hitId(hit);
             return (
-              <li key={road.id} role="option" aria-selected={i === active}>
+              <li key={id} role="option" aria-selected={i === active}>
                 <button
                   type="button"
                   // keep focus in the input so onBlur does not close the list before the click lands
                   onMouseDown={(e) => e.preventDefault()}
                   onMouseEnter={() => setActive(i)}
-                  onClick={() => choose(road)}
+                  onClick={() => choose(hit)}
                   className={`flex w-full items-center gap-3 px-4 py-2 text-left ${i === active ? 'bg-white/10' : ''}`}
                 >
-                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: LEVEL_COLOR[level] }} />
+                  {hit.kind === 'road' ? (
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: LEVEL_COLOR[predict(hit.road, selectedTime, rain).nowLevel] }}
+                    />
+                  ) : (
+                    <span className="w-2.5 shrink-0 text-center text-[11px]" aria-hidden>
+                      {hit.place.cat ? CAT_ICON[hit.place.cat] ?? '📍' : '📍'}
+                    </span>
+                  )}
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm text-slate-100">{road.name}</span>
+                    <span className="block truncate text-sm text-slate-100">{hitName(hit)}</span>
                     <span className="block text-xs text-slate-400">
-                      {TYPE_LABEL[road.type]} · {(road.lengthM / 1000).toFixed(1)} km
+                      {hit.kind === 'road'
+                        ? `${TYPE_LABEL[hit.road.type]} · ${(hit.road.lengthM / 1000).toFixed(1)} km`
+                        : `${PLACE_KIND_LABEL[hit.place.kind]} · cameras nearby`}
                     </span>
                   </span>
                 </button>

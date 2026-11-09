@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# big OpenStreetMap download for build-streets (public/data/streets.bin is the small result)
+/scripts/data/karachi_streets.json
+/scripts/data/.osm-cache/
+/scripts/data/karachi_places.json
+/scripts/data/karachi_restrictions.json
+/scripts/data/karachi_signals.json

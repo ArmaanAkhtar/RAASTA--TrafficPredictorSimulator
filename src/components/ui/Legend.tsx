@@ -27,7 +27,7 @@ export default function Legend() {
           <span className="text-slate-200">Better route</span>
         </li>
       </ul>
-      <p className="mt-2 text-slate-500">More cars = more rush</p>
+      <p className="mt-2 text-slate-500">Thin grey lines are streets (no prediction)</p>
     </div>
   );
 }
