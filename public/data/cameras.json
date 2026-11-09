@@ -1,0 +1,32 @@
+[
+  {
+    "id": "cam1",
+    "name": "Shahrah-e-Faisal camera",
+    "roadId": "shahrah-e-faisal",
+    "position": [
+      10301.7,
+      981.1
+    ],
+    "videoSrc": "/videos/cam1.mp4"
+  },
+  {
+    "id": "cam2",
+    "name": "University Road camera",
+    "roadId": "university-road",
+    "position": [
+      12180.7,
+      6283.9
+    ],
+    "videoSrc": "/videos/cam2.mp4"
+  },
+  {
+    "id": "cam3",
+    "name": "M.A. Jinnah Road camera",
+    "roadId": "m-a-jinnah-road",
+    "position": [
+      1475.6,
+      219.2
+    ],
+    "videoSrc": "/videos/cam3.mp4"
+  }
+]

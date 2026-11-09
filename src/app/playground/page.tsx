@@ -1,21 +1,27 @@
 // src/app/playground/page.tsx
 // Test page for all UI components, without the 3D scene.
-// Roads are drawn on a 2D canvas, coloured by predicted rush, so the time picker,
-// filters, search and side panel can all be checked here.
+// Roads are drawn on a 2D canvas coloured by predicted rush; the better route is drawn in blue
+// and cameras are shown as amber squares.
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import CameraModal from '../../components/ui/CameraModal';
+import DemoButton from '../../components/ui/DemoButton';
 import FilterBar from '../../components/ui/FilterBar';
+import HintChip from '../../components/ui/HintChip';
+import IntroOverlay from '../../components/ui/IntroOverlay';
 import Legend from '../../components/ui/Legend';
 import SearchBar from '../../components/ui/SearchBar';
 import SidePanel from '../../components/ui/SidePanel';
 import TimePicker from '../../components/ui/TimePicker';
 import { LEVEL_COLOR, predict } from '../../lib/api';
-import { loadRoads } from '../../lib/roads'; // real data directly, even before api.ts is switched
-import type { Road, RoadType, RushLevel } from '../../lib/types';
+import { loadCameras } from '../../lib/cameras';
+import { loadRoads } from '../../lib/roads';
+import type { CameraFeed, Road, RoadType, RushLevel } from '../../lib/types';
 import { useAppStore } from '../../store/useAppStore';
 
 const BG = '#0b1220';
+const ROUTE_BLUE = '#7cc4ff';
 const WIDTH: Record<RoadType, number> = { highway: 2.6, arterial: 1.7, local: 1.1 };
 const DRAW_ORDER: RoadType[] = ['local', 'arterial', 'highway'];
 
@@ -49,7 +55,11 @@ export default function PlaygroundPage() {
   const selectedTime = useAppStore((s) => s.selectedTime);
   const rain = useAppStore((s) => s.rain);
   const filter = useAppStore((s) => s.filter);
+  const altRoute = useAppStore((s) => s.altRoute);
+  const showRoute = useAppStore((s) => s.showRoute);
+  const openCamera = useAppStore((s) => s.openCamera);
 
+  const [cameras, setCameras] = useState<CameraFeed[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -71,6 +81,21 @@ export default function PlaygroundPage() {
     };
   }, [roads.length, setRoads]);
 
+  // Load cameras (for the buttons and the squares on the map)
+  useEffect(() => {
+    let alive = true;
+    loadCameras()
+      .then((c) => {
+        if (alive) setCameras(c);
+      })
+      .catch(() => {
+        // cameras.json missing: the camera buttons simply do not show
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   // Track canvas size
   useEffect(() => {
     const el = wrapRef.current;
@@ -85,7 +110,6 @@ export default function PlaygroundPage() {
 
   const bounds = useMemo(() => getBounds(roads), [roads]);
 
-  // Predicted level for every road at the selected time
   const levels = useMemo(() => {
     const m = new Map<string, RushLevel>();
     for (const r of roads) m.set(r.id, predict(r, selectedTime, rain).nowLevel);
@@ -117,17 +141,18 @@ export default function PlaygroundPage() {
 
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-    const drawRoad = (road: Road, color: string, width: number) => {
+    const drawLine = (pts: Array<[number, number]>, color: string, width: number) => {
       ctx.strokeStyle = color;
       ctx.lineWidth = width;
-      for (const seg of road.segments) {
-        ctx.beginPath();
-        seg.forEach(([x, y], i) => {
-          if (i === 0) ctx.moveTo(toX(x), toY(y));
-          else ctx.lineTo(toX(x), toY(y));
-        });
-        ctx.stroke();
-      }
+      ctx.beginPath();
+      pts.forEach(([x, y], i) => {
+        if (i === 0) ctx.moveTo(toX(x), toY(y));
+        else ctx.lineTo(toX(x), toY(y));
+      });
+      ctx.stroke();
+    };
+    const drawRoad = (road: Road, color: string, width: number) => {
+      for (const seg of road.segments) drawLine(seg, color, width);
     };
 
     for (const t of DRAW_ORDER) {
@@ -144,7 +169,32 @@ export default function PlaygroundPage() {
       drawRoad(selected, '#ffffff', WIDTH[selected.type] + 4);
       drawRoad(selected, LEVEL_COLOR[levels.get(selected.id) ?? 'light'], WIDTH[selected.type] + 1.5);
     }
-  }, [roads, bounds, size, levels, filter, selectedRoadId]);
+
+    // Better route
+    if (showRoute && altRoute && altRoute.path.length > 1) {
+      drawLine(altRoute.path, 'rgba(124,196,255,0.35)', 10);
+      drawLine(altRoute.path, ROUTE_BLUE, 4);
+      const first = altRoute.path[0];
+      const last = altRoute.path[altRoute.path.length - 1];
+      for (const [x, y] of [first, last]) {
+        ctx.fillStyle = ROUTE_BLUE;
+        ctx.beginPath();
+        ctx.arc(toX(x), toY(y), 6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Cameras
+    for (const cam of cameras) {
+      const x = toX(cam.position[0]);
+      const y = toY(cam.position[1]);
+      ctx.fillStyle = '#ffb547';
+      ctx.fillRect(x - 5, y - 5, 10, 10);
+      ctx.strokeStyle = BG;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x - 5, y - 5, 10, 10);
+    }
+  }, [roads, bounds, size, levels, filter, selectedRoadId, altRoute, showRoute, cameras]);
 
   return (
     <main className="relative h-screen w-full overflow-hidden bg-[#0b1220] text-slate-100">
@@ -154,21 +204,43 @@ export default function PlaygroundPage() {
 
       {/* Top-left controls */}
       <div className="absolute left-4 right-4 top-4 z-20 flex flex-col gap-3 sm:right-auto sm:w-[360px]">
-        <div className="flex items-center gap-2">
-          <h1 className="text-sm font-semibold text-[#ffb547]">Karachi Traffic · UI playground</h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-sm font-semibold text-[#ffb547]">Raasta · UI playground</h1>
           <span className="text-xs text-slate-500">{roads.length} roads</span>
         </div>
         <SearchBar />
         <TimePicker />
         <FilterBar />
+        <DemoButton />
       </div>
 
-      {/* Bottom-left legend (hidden on small phones so the bottom sheet has room) */}
-      <div className="absolute bottom-4 left-4 z-10 hidden sm:block">
+      {/* Bottom-left: cameras + legend */}
+      <div className="absolute bottom-4 left-4 z-10 hidden flex-col gap-3 sm:flex">
+        {cameras.length > 0 && (
+          <div className="rounded-2xl border border-white/10 bg-[#0b1220]/75 p-3 text-xs shadow-xl backdrop-blur-md">
+            <p className="mb-2 font-medium uppercase tracking-wide text-slate-400">Cameras</p>
+            <div className="flex flex-col gap-1">
+              {cameras.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => openCamera(c.id)}
+                  className="flex items-center gap-2 rounded-lg px-2 py-1 text-left text-slate-200 hover:bg-white/10"
+                >
+                  <span className="h-2.5 w-2.5 bg-[#ffb547]" />
+                  {c.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <Legend />
       </div>
 
+      <HintChip />
       <SidePanel />
+      <CameraModal />
+      <IntroOverlay />
 
       {error && (
         <div className="absolute inset-x-4 bottom-4 z-40 rounded-lg border border-red-500/40 bg-red-950/90 p-3 text-sm text-red-200 sm:left-auto sm:w-96">
