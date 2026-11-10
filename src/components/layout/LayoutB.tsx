@@ -1,6 +1,7 @@
 'use client';
 
 // Layout B "Top bar + drawer": a slim bar on top, everything else in a drawer that slides in.
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import CameraModal from '@/components/ui/CameraModal';
 import DemoButton from '@/components/ui/DemoButton';
@@ -78,7 +79,7 @@ export default function LayoutB() {
 
           <div className={`${mobileSearch ? 'hidden md:flex' : 'flex'} w-full items-center gap-2`}>
             <div className="flex shrink-0 items-baseline gap-2 pl-1">
-              <span className="text-lg font-semibold leading-none text-[#ffb547]">Raasta</span>
+              <Image src="/raasta_logo_header.svg" width={119} height={28} alt="Raasta" className="h-6 w-auto md:h-7" />
               <span className="hidden text-xs text-slate-400 xl:inline">Know the rush before you leave</span>
             </div>
 
