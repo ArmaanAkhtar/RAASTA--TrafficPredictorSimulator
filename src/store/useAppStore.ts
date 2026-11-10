@@ -11,6 +11,7 @@ interface AppState {
   showRoute: boolean;
   activeCameraId: string | null;
   flyToken: number;
+  lowGraphics: boolean;
   setRoads: (roads: Road[]) => void;
   selectRoad: (id: string | null) => void;
   setTime: (time: SelectedTime) => void;
@@ -19,6 +20,7 @@ interface AppState {
   setAltRoute: (route: RouteResult | null) => void;
   setShowRoute: (show: boolean) => void;
   openCamera: (id: string | null) => void;
+  setLowGraphics: (low: boolean) => void;
 }
 
 
@@ -32,6 +34,7 @@ export const useAppStore = create<AppState>((set) => ({
   showRoute: false,
   activeCameraId: null,
   flyToken: 0,
+  lowGraphics: false,
   setRoads: (roads) => set({ roads }),
   selectRoad: (selectedRoadId) => set((state) => ({
     selectedRoadId,
@@ -47,4 +50,5 @@ export const useAppStore = create<AppState>((set) => ({
   setAltRoute: (altRoute) => set({ altRoute }),
   setShowRoute: (showRoute) => set({ showRoute }),
   openCamera: (activeCameraId) => set({ activeCameraId }),
+  setLowGraphics: (lowGraphics) => set({ lowGraphics }),
 }));

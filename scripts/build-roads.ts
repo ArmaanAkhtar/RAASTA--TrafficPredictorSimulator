@@ -64,6 +64,10 @@ const ALIASES: Record<string, string> = {
   shahrahifaisal: 'Shahrah-e-Faisal',
   shahraheefaisal: 'Shahrah-e-Faisal',
   faisalroad: 'Shahrah-e-Faisal',
+  shahrahefaisaldrighroad: 'Shahrah-e-Faisal',
+  shahrahefaisalscandalpointroad: 'Shahrah-e-Faisal',
+  shahrahefaisalshahrahefaisaldrighroad: 'Shahrah-e-Faisal',
+  sharaefaisaldrighroad: 'Shahrah-e-Faisal',
   // University Road
   universityroad: 'University Road',
   universityrd: 'University Road',

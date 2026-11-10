@@ -3,12 +3,15 @@
 // No props: reads/writes the store only.
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Bar, BarChart, Cell, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 import { findAltRoute, LEVEL_COLOR, levelOf, predict } from '../../lib/api';
-import type { RoadType, RushLevel, SelectedTime } from '../../lib/types';
+import type { RoadType, RouteResult, RushLevel, SelectedTime } from '../../lib/types';
 import { useAppStore } from '../../store/useAppStore';
 import { formatTime } from './TimePicker';
+import { CameraList, useCameras } from './CameraList';
+import { camerasOnRoad } from '../../lib/cameras';
+import { useRoadGraph } from '../../lib/roadGraphStore';
 
 const TYPE_LABEL: Record<RoadType, string> = { highway: 'Highway', arterial: 'Arterial road', local: 'Local road' };
 const LEVEL_LABEL: Record<RushLevel, string> = { light: 'Light', medium: 'Medium', heavy: 'Heavy' };
@@ -113,21 +116,36 @@ export default function SidePanel() {
   const rain = useAppStore((s) => s.rain);
   const selectRoad = useAppStore((s) => s.selectRoad);
   const setAltRoute = useAppStore((s) => s.setAltRoute);
+  const setShowRoute = useAppStore((s) => s.setShowRoute);
+  const autoShownFor = useRef<string | null>(null); // road the route was last auto-shown for
+  const ownRoute = useRef<RouteResult | null>(null); // the route object this panel put in the store
 
   const [collapsed, setCollapsed] = useState(false); // mobile only
+  const allCameras = useCameras();
+  const graphVersion = useRoadGraph((s) => s.version); // re-route when the directed graph arrives
 
   const road = useMemo(() => roads.find((r) => r.id === selectedRoadId) ?? null, [roads, selectedRoadId]);
   const prediction = useMemo(() => (road ? predict(road, selectedTime, rain) : null), [road, selectedTime, rain]);
   const needsRoute = prediction !== null && prediction.jamChanceNextHour > ROUTE_THRESHOLD;
 
   // Compute the better route when the jam chance is high; clear it otherwise
+  // and draw it in blue straight away the first time a busy road is picked (user can still hide it)
+  // Only ever clear a route this panel created (never the Trip planner's route)
   useEffect(() => {
+    if (!road) autoShownFor.current = null;
     if (!road || !needsRoute) {
-      setAltRoute(null);
+      if (ownRoute.current && useAppStore.getState().altRoute === ownRoute.current) setAltRoute(null);
+      ownRoute.current = null;
       return;
     }
-    setAltRoute(findAltRoute(roads, road.id, selectedTime, rain));
-  }, [road, needsRoute, roads, selectedTime, rain, setAltRoute]);
+    const route = findAltRoute(roads, road.id, selectedTime, rain);
+    ownRoute.current = route;
+    setAltRoute(route);
+    if (route && autoShownFor.current !== road.id) {
+      autoShownFor.current = road.id;
+      setShowRoute(true);
+    }
+  }, [road, needsRoute, roads, selectedTime, rain, setAltRoute, setShowRoute, graphVersion]);
 
   // Next 4 whole hours (can roll over into the next day)
   const chartData = useMemo(() => {
@@ -227,6 +245,13 @@ export default function SidePanel() {
 
         {/* Better route (M4) */}
         <BetterRouteCard mainJam={jam} />
+
+        {/* Traffic cameras on this road (live view once Sindh Safe City grants access) */}
+        <CameraList
+          title="Cameras on this road"
+          cameras={camerasOnRoad(allCameras, road.id)}
+          emptyText="No traffic cameras reported on this road yet."
+        />
       </div>
     </aside>
   );
