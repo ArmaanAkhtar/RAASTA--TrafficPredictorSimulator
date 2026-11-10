@@ -1,6 +1,7 @@
 'use client';
 
 // Layout A "Floating panels": everything in one glass column on the top-left (like /playground).
+import Image from 'next/image';
 import { useState } from 'react';
 import CameraModal from '@/components/ui/CameraModal';
 import DemoButton from '@/components/ui/DemoButton';
@@ -36,7 +37,7 @@ export default function LayoutA() {
       <div className="pointer-events-none absolute inset-0 z-20">
         <div className="pointer-events-auto absolute left-3 right-3 top-3 flex flex-col gap-3 sm:left-4 sm:right-auto sm:top-4 sm:w-[360px]">
           <div className="flex items-baseline gap-2 px-1">
-            <h1 className="text-lg font-semibold leading-none text-[#ffb547]">Raasta</h1>
+            <Image src="/raasta_logo_header.svg" width={119} height={28} alt="Raasta" className="h-6 w-auto md:h-7" />
             <p className="truncate text-xs text-slate-400">Know the rush before you leave</p>
           </div>
 
