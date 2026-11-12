@@ -21,6 +21,7 @@ import { useTripPanelVisible } from '@/lib/trip';
 import TimeChip from './TimeChip';
 import MobileExperience from './MobileExperience';
 import { useMobileViewport } from './useMobileViewport';
+import MapControlStack from './MapControlStack';
 
 export default function LayoutA() {
   const isMobile = useMobileViewport();
@@ -38,14 +39,18 @@ function DesktopLayoutA() {
   return (
     <>
       <div className="pointer-events-none absolute inset-0 z-40">
-        <div className="raasta-scroll pointer-events-auto absolute left-2 right-2 top-2 flex max-h-[calc(100dvh-1rem)] flex-col gap-2 overflow-visible sm:left-4 sm:right-auto sm:top-4 md:max-h-[calc(100dvh-2rem)] md:w-[360px] md:gap-3 md:overflow-y-auto md:overscroll-contain md:pr-1">
+        <div className={`raasta-scroll pointer-events-auto absolute left-2 right-2 top-2 flex max-h-[calc(100dvh-1rem)] flex-col gap-2 overflow-visible sm:left-4 sm:right-auto sm:top-4 md:max-h-[calc(100dvh-2rem)] md:w-[360px] md:overflow-y-auto md:overscroll-contain md:pr-1 lg:w-max ${
+          roadSelected ? 'lg:max-w-[calc(100vw-428px)]' : 'lg:max-w-[calc(100vw-2rem)]'
+        }`}>
           <div className="flex items-center gap-2 md:flex-col md:items-start">
-            <div className="raasta-panel flex w-[128px] shrink-0 flex-col items-start gap-0.5 px-2 py-1.5 md:w-full md:gap-1.5 md:px-4 md:py-3">
-              <Image src="/raasta_logo_header.svg" width={170} height={40} alt="Raasta" className="h-7 w-auto md:h-10" />
-              <p className="hidden max-w-[120px] text-[8px] leading-tight uppercase tracking-[0.1em] text-[#f6f2ea]/70 min-[390px]:block md:max-w-none md:text-xs md:tracking-[0.14em]">Know the rush before you leave</p>
+            <div className="raasta-panel flex w-[128px] shrink-0 flex-col items-start gap-0.5 px-2 py-1.5 md:w-[360px] md:gap-1 md:px-4 md:py-2">
+              <Image src="/raasta_logo_header.svg" width={170} height={40} alt="Raasta" className="h-7 w-auto md:h-8" />
+              <p className="hidden max-w-[120px] text-[8px] leading-tight uppercase tracking-[0.1em] text-[#f6f2ea]/70 min-[390px]:block md:max-w-none md:text-[11px] md:tracking-[0.12em]">Know the rush before you leave</p>
             </div>
-            <div className="min-w-0 flex-1 md:w-full md:flex-none">
-              <SearchBar />
+            <div className="flex min-w-0 flex-1 items-center gap-2 md:w-max md:flex-none">
+              <div className="min-w-0 flex-1 md:w-[360px] md:flex-none">
+                <SearchBar />
+              </div>
             </div>
           </div>
 
@@ -55,22 +60,20 @@ function DesktopLayoutA() {
           <div className={`${timeOpen ? 'block' : 'hidden'} md:hidden`}>
             <TimePicker />
           </div>
-          <div className="hidden md:block">
+          <div className="hidden md:block md:w-[360px]">
             <TimePicker />
           </div>
 
-          <div className={roadSelected ? 'hidden md:block' : 'block'}>
+          <div className={roadSelected ? 'hidden md:block md:w-[360px]' : 'block md:w-[360px]'}>
             <TripPlanner mobileSheetActive={!roadSelected} />
           </div>
 
-          <div className="hidden flex-wrap items-center gap-2 md:flex">
+          <div className="hidden md:block md:w-[360px]">
             <FilterBar />
           </div>
-          <div className="hidden flex-wrap items-center gap-2 md:flex">
-            <DemoButton />
-            <LocateButton />
-          </div>
         </div>
+
+        <MapControlStack panelOpen={roadSelected} />
 
         <div className="raasta-mobile-floats pointer-events-auto fixed right-3 bottom-[calc(25dvh+0.75rem+env(safe-area-inset-bottom))] z-30 flex flex-col items-end gap-2 md:hidden">
           <div className="raasta-mobile-demo"><DemoButton /></div>

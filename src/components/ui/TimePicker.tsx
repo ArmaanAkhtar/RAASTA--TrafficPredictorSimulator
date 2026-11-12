@@ -51,8 +51,8 @@ export default function TimePicker({ mobileEmbedded = false }: { mobileEmbedded?
               type="button"
               aria-pressed={on}
               onClick={() => setTime({ ...selectedTime, day: i })}
-              className={`min-h-11 flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors md:min-h-10 ${
-                on ? 'bg-[#7cc4ff] text-[#0b1220]' : 'bg-white/5 text-slate-300 hover:bg-white/10'
+              className={`min-h-11 flex-1 rounded-lg border py-1.5 text-xs font-medium transition-colors md:min-h-10 ${
+                on ? 'border-[#7cc4ff] bg-[#7cc4ff] text-[#0b1220]' : 'border-[#1f2a44] bg-[#0f1729] text-slate-300 hover:border-[#7cc4ff] hover:bg-[#14233a]'
               }`}
             >
               {label}

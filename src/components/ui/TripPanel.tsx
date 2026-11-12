@@ -112,7 +112,7 @@ export default function TripPanel({ mobileEmbedded = false }: { mobileEmbedded?:
       onWheelCapture={(event) => event.stopPropagation()}
       className={mobileEmbedded
         ? 'flex min-h-0 flex-1 flex-col overflow-hidden text-slate-100'
-        : `raasta-panel fixed inset-x-0 bottom-0 z-30 flex ${snapHeightClass} flex-col overflow-hidden pb-[env(safe-area-inset-bottom)] text-slate-100 transition-[height] duration-300 md:inset-x-auto md:bottom-4 md:right-4 md:top-4 md:h-auto md:max-h-[calc(100dvh-2rem)] md:w-[360px] md:pb-0`}
+        : `raasta-panel fixed inset-x-0 bottom-0 z-30 flex ${snapHeightClass} flex-col overflow-hidden pb-[env(safe-area-inset-bottom)] text-slate-100 transition-[height] duration-300 md:inset-x-auto md:bottom-4 md:right-4 md:top-4 md:h-auto md:max-h-[calc(100dvh-2rem)] md:w-[360px] md:pb-0 lg:w-[380px]`}
       aria-label={`Trip from ${from.name} to ${to.name}`}
     >
       {/* Mobile drag handle */}
@@ -152,26 +152,26 @@ export default function TripPanel({ mobileEmbedded = false }: { mobileEmbedded?:
       <div className="raasta-scroll min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 pb-4">
         {/* Now */}
         <div className="grid grid-cols-3 gap-2">
-          <div className="raasta-card p-2.5">
+          <div className={`raasta-card ${mobileEmbedded ? 'rounded-[14px] p-4' : 'p-2.5'}`}>
             <p className="raasta-section-label">Time</p>
-            <p className="text-lg font-bold tabular-nums">{walking ? formatWalk(current.minutes) : `${current.minutes} min`}</p>
+            <p className={`${mobileEmbedded ? 'text-xl' : 'text-lg'} font-bold tabular-nums`}>{walking ? formatWalk(current.minutes) : `${current.minutes} min`}</p>
           </div>
-          <div className="raasta-card p-2.5">
+          <div className={`raasta-card ${mobileEmbedded ? 'rounded-[14px] p-4' : 'p-2.5'}`}>
             <p className="raasta-section-label">Distance</p>
-            <p className="text-lg font-bold tabular-nums">{current.distanceKm} km</p>
+            <p className={`${mobileEmbedded ? 'text-xl' : 'text-lg'} font-bold tabular-nums`}>{current.distanceKm} km</p>
             <p className="text-[11px] tabular-nums text-slate-500">
               {walking ? 'no petrol' : `${current.fuelLitres.toFixed(1)} L petrol`}
             </p>
           </div>
           {walking ? (
-            <div className="raasta-card p-2.5">
+            <div className={`raasta-card ${mobileEmbedded ? 'rounded-[14px] p-4' : 'p-2.5'}`}>
               <p className="raasta-section-label">Steps</p>
-              <p className="text-lg font-bold tabular-nums">~{Math.round(current.distanceKm * 1.3)}k</p>
+              <p className={`${mobileEmbedded ? 'text-xl' : 'text-lg'} font-bold tabular-nums`}>~{Math.round(current.distanceKm * 1.3)}k</p>
             </div>
           ) : (
-            <div className="raasta-card p-2.5">
+            <div className={`raasta-card ${mobileEmbedded ? 'rounded-[14px] p-4' : 'p-2.5'}`}>
               <p className="raasta-section-label">Jam chance</p>
-              <p className="text-lg font-bold tabular-nums" style={{ color: jamColour(current.jamChance) }}>
+              <p className="text-2xl font-bold tabular-nums" style={{ color: jamColour(current.jamChance) }}>
                 {current.jamChance}%
               </p>
             </div>
@@ -181,7 +181,7 @@ export default function TripPanel({ mobileEmbedded = false }: { mobileEmbedded?:
 
         {/* Advice */}
         {advice.kind === 'clear-now' && (
-          <div className="rounded-xl border border-[#30a46c]/40 bg-[#30a46c]/10 p-3">
+          <div className={`rounded-[14px] border border-[#30a46c]/40 bg-[#30a46c]/10 ${mobileEmbedded ? 'p-4' : 'p-3'}`}>
             <p className="text-sm font-semibold text-[#5fd497]">The route is clear now</p>
             <p className="mt-1 text-xs text-slate-300">Light traffic expected. Good time to leave.</p>
           </div>
@@ -189,7 +189,7 @@ export default function TripPanel({ mobileEmbedded = false }: { mobileEmbedded?:
 
         {(advice.kind === 'wait' || advice.kind === 'better-later') && advice.slot.trip && (
           <div
-            className={`rounded-xl border p-3 ${
+            className={`rounded-[14px] border ${mobileEmbedded ? 'p-4' : 'p-3'} ${
               advice.kind === 'wait' ? 'border-[#30a46c]/40 bg-[#30a46c]/10' : 'border-[#7cc4ff]/30 bg-[#7cc4ff]/5'
             }`}
           >
@@ -201,13 +201,19 @@ export default function TripPanel({ mobileEmbedded = false }: { mobileEmbedded?:
             <p className="mt-1 text-xs text-slate-300">
               If you want to go without the traffic, leave at {leaveAt(advice.slot)}: about{' '}
               <span className="font-semibold text-slate-100">{advice.slot.trip.minutes} min</span>
-              {advice.savesMin > 0 ? ` instead of ${current.minutes} (saves ${advice.savesMin} min)` : ''}
+              {advice.savesMin > 0 && !mobileEmbedded ? ` instead of ${current.minutes} (saves ${advice.savesMin} min)` : ''}
               {advice.kind === 'better-later' ? '. It will still be a bit busy.' : '.'}
             </p>
+            {mobileEmbedded && advice.savesMin > 0 && (
+              <div className="mt-3 border-t border-[#1f2a44] pt-3">
+                <p className="raasta-section-label">Minutes saved</p>
+                <p className="mt-1 text-2xl font-bold tabular-nums text-[#30a46c]">{advice.savesMin} min</p>
+              </div>
+            )}
             <button
               type="button"
               onClick={() => setTime(advice.slot.time)}
-              className="mt-2 w-full rounded-lg bg-[#7cc4ff] py-1.5 text-xs font-semibold text-[#0b1220] hover:opacity-90"
+              className="mt-2 min-h-11 w-full rounded-[14px] bg-[#7cc4ff] py-1.5 text-xs font-semibold text-[#0b1220] hover:opacity-90"
             >
               Plan for {leaveAt(advice.slot)}
             </button>
@@ -215,7 +221,7 @@ export default function TripPanel({ mobileEmbedded = false }: { mobileEmbedded?:
         )}
 
         {advice.kind === 'walk' && (
-          <div className="rounded-xl border border-[#7cc4ff]/40 bg-[#7cc4ff]/10 p-3">
+          <div className={`rounded-[14px] border border-[#7cc4ff]/40 bg-[#7cc4ff]/10 ${mobileEmbedded ? 'p-4' : 'p-3'}`}>
             <p className="text-sm font-semibold text-[#7cc4ff]">Walking: traffic will not slow you down</p>
             <p className="mt-1 text-xs text-slate-300">
               About {formatWalk(current.minutes)} at a normal pace. The route stays off expressways and may use either side of
@@ -226,7 +232,7 @@ export default function TripPanel({ mobileEmbedded = false }: { mobileEmbedded?:
         )}
 
         {advice.kind === 'steady' && (
-          <div className="rounded-xl border border-[#7cc4ff]/30 bg-[#7cc4ff]/5 p-3">
+          <div className={`rounded-[14px] border border-[#7cc4ff]/30 bg-[#7cc4ff]/5 ${mobileEmbedded ? 'p-4' : 'p-3'}`}>
             <p className="text-sm font-semibold text-[#7cc4ff]">
               {advice.worsens ? 'Leave now: it gets busier later' : 'Busy but moving for the next 2 hours'}
             </p>
@@ -239,7 +245,7 @@ export default function TripPanel({ mobileEmbedded = false }: { mobileEmbedded?:
         )}
 
         {advice.kind === 'jammed' && (
-          <div className="rounded-xl border border-[#e5484d]/40 bg-[#e5484d]/10 p-3">
+          <div className={`rounded-[14px] border border-[#e5484d]/40 bg-[#e5484d]/10 ${mobileEmbedded ? 'p-4' : 'p-3'}`}>
             <p className="text-sm font-semibold text-[#e5484d]">This route stays jammed for the next 2 hours</p>
             <p className="mt-1 text-xs text-slate-300">
               Leaving later will not help much. Pick what matters more to you:
@@ -253,7 +259,7 @@ export default function TripPanel({ mobileEmbedded = false }: { mobileEmbedded?:
                     key={m}
                     type="button"
                     onClick={() => setMode(m)}
-                    className={`rounded-lg border p-2 text-left ${on ? 'border-[#7cc4ff]/60 bg-[#7cc4ff]/10' : 'border-[#1f2a44] bg-[#0f1729]/45 hover:bg-[#0f1729]/80'}`}
+                    className={`rounded-[14px] border ${mobileEmbedded ? 'min-h-20 p-4' : 'p-2'} text-left ${on ? 'border-[#7cc4ff]/60 bg-[#7cc4ff]/10' : 'border-[#1f2a44] bg-[#0f1729]/45 hover:bg-[#0f1729]/80'}`}
                   >
                     <p className="text-[11px] text-slate-400">{MODE_LABEL[m]}</p>
                     {tr ? (
@@ -275,7 +281,7 @@ export default function TripPanel({ mobileEmbedded = false }: { mobileEmbedded?:
 
         {/* Next 2 hours (not for walking: traffic does not change a walk) */}
         {!walking && (
-        <div className="raasta-card p-3">
+        <div className={`raasta-card ${mobileEmbedded ? 'rounded-[14px] p-4' : 'p-3'}`}>
           <div className="mb-2 flex items-baseline justify-between">
             <p className="text-xs text-slate-400">If you leave at… (next 2 hours)</p>
             <p className="text-[10px] text-slate-500">minutes</p>
@@ -308,6 +314,7 @@ export default function TripPanel({ mobileEmbedded = false }: { mobileEmbedded?:
         <CameraList
           title="Cameras on your route"
           cameras={routeCameras}
+          className={mobileEmbedded ? 'rounded-[14px] p-4' : 'p-3'}
           detail={(c) => {
             const along = routeCameras.find((r) => r.id === c.id)?.alongKm ?? 0;
             return `${c.roadName} · ${along} km into the trip`;

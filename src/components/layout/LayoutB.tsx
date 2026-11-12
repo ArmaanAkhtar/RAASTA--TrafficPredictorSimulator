@@ -21,6 +21,7 @@ import { useTripPanelVisible } from '@/lib/trip';
 import TimeChip from './TimeChip';
 import MobileExperience from './MobileExperience';
 import { useMobileViewport } from './useMobileViewport';
+import MapControlStack from './MapControlStack';
 
 const GLASS = 'raasta-panel';
 const ICON_BTN =
@@ -60,15 +61,15 @@ function DesktopLayoutB() {
     [],
   );
 
-  // On desktop the bar stops before the side panel (360px + 16px gap + 16px margin).
-  const barRight = roadSelected ? 'md:right-[392px]' : 'md:right-4';
+  // Keep the bar clear of the fixed-width right panel.
+  const barRight = roadSelected ? 'md:right-[392px] lg:right-[412px]' : 'md:right-4';
 
   return (
     <>
       <div className="pointer-events-none absolute inset-0 z-40">
         {/* ---------- Top bar ---------- */}
         <header
-          className={`pointer-events-auto absolute left-2 right-2 top-2 flex min-h-[56px] items-center gap-2 px-2 py-2 md:left-4 md:top-4 md:min-h-[84px] md:px-3 ${barRight} ${GLASS}`}
+          className={`pointer-events-auto absolute left-2 right-2 top-2 flex min-h-[56px] flex-col items-stretch gap-1 px-2 py-2 md:left-4 md:top-4 md:min-h-[84px] md:px-3 ${barRight} ${GLASS}`}
         >
           <div className="flex w-full min-w-0 items-center gap-2">
             <div className="raasta-panel flex w-[128px] shrink-0 flex-col items-start gap-0.5 px-2 py-1 md:w-auto md:gap-1 md:px-3 md:py-2">
@@ -84,7 +85,6 @@ function DesktopLayoutB() {
 
             <div className="hidden shrink-0 items-center gap-2 2xl:flex">
               <TimeChip open={drawerOpen} onToggle={() => setDrawerOpen((v) => !v)} />
-              <DemoButton />
             </div>
 
             <button
@@ -108,7 +108,7 @@ function DesktopLayoutB() {
           </div>
         </header>
 
-        <div className="raasta-mobile-time-row pointer-events-none absolute left-2 right-2 top-[72px] z-20 flex items-start gap-2 min-[390px]:top-[84px] md:left-4 md:right-auto md:top-[104px] md:hidden 2xl:hidden">
+        <div className="raasta-mobile-time-row pointer-events-none absolute left-2 right-2 top-[72px] z-20 flex items-start gap-2 min-[390px]:top-[84px] md:left-4 md:right-auto md:top-[120px] md:hidden 2xl:hidden">
           <div className="pointer-events-auto relative inline-flex">
             <TimeChip open={timeOpen} onToggle={() => {
               setDrawerOpen(false);
@@ -122,7 +122,7 @@ function DesktopLayoutB() {
           </div>
         </div>
 
-        <div className="pointer-events-none absolute left-4 right-[392px] top-[104px] z-20 hidden md:flex 2xl:hidden">
+        <div className="pointer-events-none absolute left-4 right-[392px] top-[120px] z-20 hidden md:flex 2xl:hidden">
           <div className="pointer-events-auto relative">
             <TimeChip open={timeOpen} onToggle={() => {
               setDrawerOpen(false);
@@ -141,6 +141,8 @@ function DesktopLayoutB() {
           <LocateButton />
         </div>
 
+        <MapControlStack panelOpen={roadSelected} />
+
         {/* ---------- Drawer ---------- */}
         {drawerOpen && (
           // Click outside closes it
@@ -158,7 +160,7 @@ function DesktopLayoutB() {
           aria-label="Controls"
           aria-hidden={!drawerOpen}
           onWheelCapture={(event) => event.stopPropagation()}
-          className={`raasta-scroll pointer-events-auto absolute left-2 right-2 top-[132px] max-h-[calc(100dvh-144px)] overflow-y-auto overscroll-contain p-3 transition-all duration-300 md:left-4 md:right-auto md:top-[100px] md:max-h-[calc(100dvh-116px)] md:w-[340px] ${GLASS} ${
+          className={`raasta-scroll pointer-events-auto absolute left-2 right-2 top-[132px] max-h-[calc(100dvh-144px)] overflow-y-auto overscroll-contain p-3 transition-all duration-300 md:left-4 md:right-auto md:top-[100px] md:max-h-[calc(100dvh-116px)] md:w-[360px] ${GLASS} ${
             drawerOpen ? 'visible translate-x-0 opacity-100' : 'invisible -translate-y-2 opacity-0 md:-translate-x-4 md:translate-y-0'
           }`}
         >
@@ -172,13 +174,11 @@ function DesktopLayoutB() {
           </div>
           <div className="flex flex-col gap-3">
             <TimePicker />
-            <div className={roadSelected ? 'hidden md:block' : 'block'}>
+            <div className={roadSelected ? 'hidden md:block md:w-[360px]' : 'block md:w-[360px]'}>
               <TripPlanner mobileSheetActive={!roadSelected} />
             </div>
-            <div className="hidden md:block"><LocateButton /></div>
-            <div className="hidden md:block"><FilterBar /></div>
-            <div className="hidden flex-wrap items-center gap-2 2xl:hidden md:flex">
-              <DemoButton />
+            <div className="hidden md:block md:w-[360px]">
+              <FilterBar />
             </div>
           </div>
         </div>

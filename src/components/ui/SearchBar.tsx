@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import Fuse from 'fuse.js';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
@@ -386,10 +385,12 @@ export default function SearchBar({
     <div className="relative w-full">
       <div className={`${mobile ? 'raasta-mobile-search raasta-panel flex h-12 items-center gap-2 px-3' : `${GLASS} flex items-center gap-2 px-3 py-2.5`}`}>
         {mobile ? (
-          <span className="grid h-[22px] w-[22px] shrink-0 place-items-center" aria-hidden="true">
-            <span className="relative h-[22px] w-[11px] overflow-hidden">
-              <Image src="/raasta_logo_header.svg" alt="" width={94} height={22} className="absolute left-[-12px] top-0 h-[22px] w-[94px] max-w-none" priority />
-            </span>
+          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-[#14233a] text-[#7cc4ff]" aria-hidden="true">
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M7 21v-7a5 5 0 0 1 5-5h1a5 5 0 0 0 5-5V3" />
+              <path d="M13 9h2a3 3 0 0 1 3 3v2" />
+              <path d="M7 18h3" />
+            </svg>
           </span>
         ) : (
           <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-[#8f9bb8]" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
@@ -432,7 +433,7 @@ export default function SearchBar({
                   setQuery('');
                   inputRef.current?.focus();
                 }}
-                className="grid h-11 w-8 shrink-0 place-items-center text-[#8f9bb8]"
+                className="grid h-11 w-11 shrink-0 place-items-center text-[#8f9bb8]"
               >
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden="true">
                   <path d="m6 6 12 12M18 6 6 18" />

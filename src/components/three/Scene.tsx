@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Grid, MapControls } from '@react-three/drei';
 import { Roads } from './Roads';
@@ -13,50 +13,41 @@ import { CameraPins } from './CameraPins';
 import { UserLocation } from './UserLocation';
 import { isWeakDevice } from './usePerformance';
 import { useDaylight } from './useDaylight';
+import { projectLatLon } from '@/lib/projection';
 import * as THREE from 'three';
 
-function GradientSky({ skyColor, horizonColor, horizonGlow, scale }: { skyColor: THREE.Color; horizonColor: THREE.Color; horizonGlow: number; scale: number }) {
-  const materialRef = useRef<THREE.ShaderMaterial>(null);
-  useFrame(() => {
-    const material = materialRef.current;
-    if (!material) return;
-    material.uniforms.topColor.value.copy(skyColor);
-    material.uniforms.bottomColor.value.copy(horizonColor);
-    material.uniforms.glow.value = THREE.MathUtils.damp(material.uniforms.glow.value, horizonGlow, 5, 1 / 60);
-  });
-  return (
-    <mesh scale={scale} renderOrder={-100}>
-      <sphereGeometry args={[1, 32, 16]} />
-      <shaderMaterial
-        ref={materialRef}
-        side={THREE.BackSide}
-        depthWrite={false}
-        uniforms={{
-          topColor: { value: skyColor.clone() },
-          bottomColor: { value: horizonColor.clone() },
-          glow: { value: horizonGlow },
-        }}
-        vertexShader={`varying vec3 vWorldPosition;
-          void main() {
-            vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-            vWorldPosition = worldPosition.xyz;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-          }`}
-        fragmentShader={`uniform vec3 topColor;
-          uniform vec3 bottomColor;
-          uniform float glow;
-          varying vec3 vWorldPosition;
-          void main() {
-            float heightMix = smoothstep(-0.15, 0.7, normalize(vWorldPosition).y);
-            // horizon colour near the ground, sky colour overhead (no dark band or hard colour boundary)
-            vec3 gradient = mix(bottomColor, topColor, heightMix);
-            float edge = 1.0 - smoothstep(-0.03, 0.12, normalize(vWorldPosition).y);
-            gradient = mix(gradient, bottomColor, edge * (0.6 + glow));
-            gl_FragColor = vec4(gradient, 1.0);
-          }`}
-      />
-    </mesh>
-  );
+function SceneReadiness() {
+  const gl = useThree((state) => state.gl);
+  const roadsReady = useAppStore((state) => state.roads.length > 0);
+  const setSceneReady = useAppStore((state) => state.setSceneReady);
+
+  useEffect(() => {
+    if (roadsReady && gl.domElement) setSceneReady(true);
+  }, [gl, roadsReady, setSceneReady]);
+
+  return null;
+}
+
+const MAP_NAVY = new THREE.Color('#0b1220');
+const COASTLINE_LAT_LON = [
+  [24.84, 66.8],
+  [24.835, 66.86],
+  [24.825, 66.92],
+  [24.815, 66.98],
+  [24.805, 67.03],
+  [24.795, 67.08],
+  [24.785, 67.14],
+  [24.78, 67.2],
+  [24.785, 67.27],
+  [24.79, 67.34],
+  [24.78, 67.4],
+] as const;
+
+function configureMapBackground(scene: THREE.Scene): () => void {
+  scene.background = MAP_NAVY;
+  return () => {
+    scene.background = null;
+  };
 }
 
 interface GroundBounds {
@@ -64,24 +55,39 @@ interface GroundBounds {
   centerZ: number;
   width: number;
   depth: number;
-  margin: number;
   maxDistance: number;
   fogNear: number;
   fogFar: number;
-  skyScale: number;
 }
 
 function DaylightRig({ ground }: { ground: GroundBounds }) {
   const daylight = useDaylight();
   const scene = useThree((state) => state.scene);
-  const groundMaterial = useRef<THREE.MeshStandardMaterial>(null);
   const sun = useRef<THREE.DirectionalLight>(null);
   const hemisphere = useRef<THREE.HemisphereLight>(null);
+  const seaGeometry = useMemo(() => {
+    const coastline = COASTLINE_LAT_LON.map(([lat, lon]) => projectLatLon(lat, lon));
+    const west = ground.centerX - ground.width * 2;
+    const east = ground.centerX + ground.width * 2;
+    const south = -ground.centerZ - ground.depth * 2;
+    const shape = new THREE.Shape();
+    shape.moveTo(west, coastline[0][1]);
+    coastline.forEach(([x, y]) => shape.lineTo(x, y));
+    shape.lineTo(east, coastline[coastline.length - 1][1]);
+    shape.lineTo(east, south);
+    shape.lineTo(west, south);
+    shape.closePath();
+    return new THREE.ShapeGeometry(shape);
+  }, [ground]);
 
-  useFrame((_, delta) => {
-    scene.background = daylight.skyColor;
-    if (scene.fog instanceof THREE.Fog) scene.fog.color.copy(daylight.fogColor);
-    if (groundMaterial.current) groundMaterial.current.color.lerp(daylight.groundColor, Math.min(1, delta / 0.08));
+  useEffect(() => {
+    return configureMapBackground(scene);
+  }, [scene]);
+
+  useEffect(() => () => seaGeometry.dispose(), [seaGeometry]);
+
+  useFrame(() => {
+    if (scene.fog instanceof THREE.Fog) scene.fog.color.copy(MAP_NAVY);
     if (sun.current) {
       sun.current.position.copy(daylight.sunDirection).multiplyScalar(12000);
       sun.current.color.copy(daylight.sunColor);
@@ -96,12 +102,6 @@ function DaylightRig({ ground }: { ground: GroundBounds }) {
 
   return (
     <>
-      <GradientSky
-        skyColor={daylight.skyColor}
-        horizonColor={daylight.horizonColor}
-        horizonGlow={daylight.horizonGlow}
-        scale={ground.skyScale}
-      />
       <hemisphereLight ref={hemisphere} args={[daylight.skyColor, daylight.groundColor, daylight.ambientIntensity]} />
       <directionalLight
         ref={sun}
@@ -121,7 +121,7 @@ function DaylightRig({ ground }: { ground: GroundBounds }) {
       />
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[ground.centerX, -1, ground.centerZ]} receiveShadow={false}>
         <planeGeometry args={[ground.width, ground.depth]} />
-        <meshStandardMaterial ref={groundMaterial} color={daylight.groundColor} roughness={1} metalness={0.05} />
+        <meshBasicMaterial color="#0b1220" />
       </mesh>
       <Grid
         position={[ground.centerX, -0.5, ground.centerZ]}
@@ -136,6 +136,9 @@ function DaylightRig({ ground }: { ground: GroundBounds }) {
         fadeStrength={1.5}
         infiniteGrid
       />
+      <mesh geometry={seaGeometry} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.4, 0]} renderOrder={1}>
+        <meshBasicMaterial color="#0d1a30" side={THREE.DoubleSide} />
+      </mesh>
     </>
   );
 }
@@ -157,7 +160,7 @@ export function Scene() {
 
   const ground = useMemo(() => {
     if (roads.length === 0) {
-      return { centerX: 0, centerZ: 0, width: 10000, depth: 10000, margin: 5000, maxDistance: 42000, fogNear: 35000, fogFar: 85000, skyScale: 90000 };
+      return { centerX: 0, centerZ: 0, width: 30000, depth: 30000, maxDistance: 42000, fogNear: 35000, fogFar: 85000 };
     }
     let minX = Infinity;
     let maxX = -Infinity;
@@ -173,31 +176,24 @@ export function Scene() {
         });
       });
     });
-    const margin = 5000;
-    const rawMinX = minX - margin;
-    const rawMaxX = maxX + margin;
-    const rawMinY = minY - margin;
-    const rawMaxY = maxY + margin;
-    const width = rawMaxX - rawMinX;
-    const depth = rawMaxY - rawMinY;
-    const extent = Math.max(width, depth);
+    const sizeX = Math.max(maxX - minX, 10000);
+    const sizeZ = Math.max(maxY - minY, 10000);
+    const extent = Math.max(sizeX, sizeZ);
     const maxDistance = Math.max(42000, extent * 2.5);
     return {
-      centerX: (rawMinX + rawMaxX) * 0.5,
-      centerZ: -(rawMinY + rawMaxY) * 0.5,
-      width,
-      depth,
-      margin,
+      centerX: (minX + maxX) * 0.5,
+      centerZ: -(minY + maxY) * 0.5,
+      width: sizeX * 3,
+      depth: sizeZ * 3,
       maxDistance,
       fogNear: Math.max(35000, extent * 0.75),
       fogFar: Math.max(85000, extent * 3),
-      skyScale: Math.max(90000, maxDistance * 2),
     };
   }, [roads]);
 
   return (
     <Canvas
-      dpr={weak ? 1 : [1, 1.5]}
+      dpr={weak ? [1, 1.25] : [1, 1.5]}
       camera={{
         position: [ground.centerX, Math.max(6000, Math.max(ground.width, ground.depth) * 0.3), ground.centerZ + Math.max(7000, Math.max(ground.width, ground.depth) * 0.35)],
         fov: 45,
@@ -207,9 +203,9 @@ export function Scene() {
       gl={{ antialias: !weak, logarithmicDepthBuffer: true, powerPreference: 'high-performance' }}
       shadows={false}
       frameloop={tabVisible ? 'always' : 'never'}
-      style={{ background: '#05080f' }}
+      style={{ background: '#0b1220' }}
     >
-      <fog attach="fog" args={['#05080f', ground.fogNear, ground.fogFar]} />
+      <fog attach="fog" args={['#0b1220', ground.fogNear, ground.fogFar]} />
       <DaylightRig ground={ground} />
 
       <Streets />
@@ -219,6 +215,7 @@ export function Scene() {
       <UserLocation />
       <PlaceLabels />
       <CameraRig />
+      <SceneReadiness />
 
       <MapControls
         makeDefault
@@ -228,7 +225,7 @@ export function Scene() {
         minPolarAngle={0.15}
         maxPolarAngle={Math.PI / 2 - 0.05}
         enableDamping
-        dampingFactor={0.1}
+        dampingFactor={0.08}
         zoomSpeed={0.9}
         zoomToCursor
       />

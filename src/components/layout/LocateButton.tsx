@@ -16,7 +16,7 @@ export default function LocateButton({ iconOnly = false }: { iconOnly?: boolean 
         aria-label={iconOnly ? 'My location' : 'Show my location'}
         title="Show my location on the map"
         className={iconOnly
-          ? 'raasta-mobile-fab grid h-11 w-11 place-items-center rounded-full'
+          ? 'raasta-map-control max-md:!h-11 max-md:!w-11 max-md:!basis-11'
           : 'raasta-button-secondary flex min-h-10 items-center gap-1.5 px-3 py-2 text-xs font-semibold hover:text-[#7cc4ff]'}
       >
         <svg viewBox="0 0 24 24" className={`${iconOnly ? 'h-5 w-5' : 'h-4 w-4'} ${status === 'locating' ? 'animate-pulse' : ''}`} fill="none" stroke="currentColor" strokeWidth={iconOnly ? '1.75' : '1.5'} strokeLinecap="round" strokeLinejoin="round" aria-hidden>

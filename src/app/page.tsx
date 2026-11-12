@@ -22,12 +22,17 @@ const serverLayoutB = () => false;
 
 export default function Home() {
   const setRoads = useAppStore((state) => state.setRoads);
+  const setRoadLoadError = useAppStore((state) => state.setRoadLoadError);
   const layoutB = useSyncExternalStore(noopSubscribe, readLayoutB, serverLayoutB);
 
   useEffect(() => {
     let cancelled = false;
     void loadRoads().then((roads) => {
       if (!cancelled) setRoads(roads);
+    }).catch((error: unknown) => {
+      if (!cancelled) {
+        setRoadLoadError(error instanceof Error ? error.message : 'Road data could not be loaded.');
+      }
     });
     // Directed routing graph (one-way carriageways, real junctions, U-turn cuts), loaded in the background
     useRoadGraph.getState().load();
@@ -36,7 +41,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, [setRoads]);
+  }, [setRoadLoadError, setRoads]);
 
   return (
     <main className="relative h-dvh w-full overflow-hidden bg-[#0b1220]">

@@ -63,7 +63,7 @@ export default function AreaPanel({
       onWheelCapture={(event) => event.stopPropagation()}
       className={mobileEmbedded
         ? 'flex min-h-0 flex-1 flex-col overflow-hidden text-slate-100'
-        : `raasta-panel fixed inset-x-0 bottom-0 z-30 flex ${snapHeightClass} flex-col overflow-hidden pb-[env(safe-area-inset-bottom)] text-slate-100 transition-[height] duration-300 md:inset-x-auto md:bottom-4 md:right-4 md:top-4 md:h-auto md:max-h-[calc(100dvh-2rem)] md:w-[360px] md:pb-0`}
+        : `raasta-panel fixed inset-x-0 bottom-0 z-30 flex ${snapHeightClass} flex-col overflow-hidden pb-[env(safe-area-inset-bottom)] text-slate-100 transition-[height] duration-300 md:inset-x-auto md:bottom-4 md:right-4 md:top-4 md:h-auto md:max-h-[calc(100dvh-2rem)] md:w-[360px] md:pb-0 lg:w-[380px]`}
       aria-label={`Cameras around ${place.name}`}
     >
       {!mobileEmbedded && <button

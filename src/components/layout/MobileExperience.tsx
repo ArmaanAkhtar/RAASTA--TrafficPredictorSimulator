@@ -123,17 +123,24 @@ export default function MobileExperience() {
       <section
         data-mobile-sheet
         data-sheet-snap={snapPoint}
+        data-sheet-content-fit={panel === 'planner' ? '' : undefined}
         aria-label="Raasta"
-        className="raasta-mobile-sheet raasta-panel pointer-events-auto fixed inset-x-0 bottom-0 z-30 flex h-[88dvh] flex-col overflow-hidden"
+        className="raasta-mobile-sheet raasta-panel pointer-events-auto fixed inset-x-0 bottom-0 z-30 flex h-[88dvh] flex-col overflow-visible"
       >
-        <button
-          type="button"
-          {...handleProps}
-          className="flex h-11 w-full shrink-0 touch-none items-center justify-center"
-          aria-label={`Resize panel, currently ${snapPoint}`}
-        >
-          <span className="h-1 w-10 rounded-full bg-white/25" />
-        </button>
+        <div className="raasta-mobile-floats pointer-events-auto absolute right-3 top-[-12px] z-[45] flex -translate-y-full flex-col items-center gap-2">
+          <LocateButton iconOnly />
+          <DemoButton iconOnly />
+        </div>
+        {panel !== 'planner' && (
+          <button
+            type="button"
+            {...handleProps}
+            className="flex h-11 w-full shrink-0 touch-none items-center justify-center"
+            aria-label={`Resize panel, currently ${snapPoint}`}
+          >
+            <span className="h-1 w-10 rounded-full bg-white/25" />
+          </button>
+        )}
         <div
           id="mobile-search-results"
           ref={(element) => setSearchResultsTarget(element)}
@@ -147,7 +154,7 @@ export default function MobileExperience() {
         {panel === 'home' && (
           <div className="mobile-sheet-scroll min-h-0 flex-1 px-4 pb-1">
             <div className="flex items-start justify-between gap-3">
-              <h1 className="text-[17px] font-semibold leading-5 text-[#f6f2ea]">Karachi right now</h1>
+              <h1 className="text-base font-semibold leading-5 text-[#f6f2ea]">Karachi right now</h1>
               <p className="shrink-0 text-[11px] tabular-nums text-[#8f9bb8]">{dayLabel} · {timeLabel}</p>
             </div>
 
@@ -164,9 +171,9 @@ export default function MobileExperience() {
                   />
                 ))}
               </div>
-              <p className="mt-0.5 truncate text-[10px] leading-3 text-[#8f9bb8]">
+              <p className="mt-1 flex flex-wrap items-center gap-x-1 text-[13px] leading-5 text-[#8f9bb8]">
                 {total
-                  ? <>Heavy {summary.heavy} <span className="px-1 text-[#1f2a44]">·</span> Medium {summary.medium} <span className="px-1 text-[#1f2a44]">·</span> Light {summary.light}</>
+                  ? <>Heavy {summary.heavy} <span className="text-[#1f2a44]">·</span> Medium {summary.medium} <span className="text-[#1f2a44]">·</span> Light {summary.light}</>
                   : 'Traffic data loading'}
               </p>
             </div>
@@ -223,18 +230,18 @@ export default function MobileExperience() {
 
 function SheetHeading({ title, onClose }: { title: string; onClose: () => void }) {
   return (
-    <div className="mb-3 flex min-h-11 items-center gap-3">
-      <h2 className="min-w-0 flex-1 text-[17px] font-semibold text-[#f6f2ea]">{title}</h2>
+    <div className="flex min-h-11 shrink-0 items-center gap-3 px-4 pt-2">
       <button
         type="button"
         onClick={onClose}
         aria-label="Back to Karachi right now"
-        className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-[#1f2a44] text-[#8f9bb8] hover:border-[#7cc4ff] hover:text-[#f6f2ea]"
+        className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-[#1f2a44] bg-[#141d33] text-[#8f9bb8] hover:border-[#7cc4ff] hover:text-[#f6f2ea]"
       >
         <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M19 12H5m7 7-7-7 7-7" />
         </svg>
       </button>
+      <h2 className="min-w-0 flex-1 text-[17px] font-semibold text-[#f6f2ea]">{title}</h2>
     </div>
   );
 }

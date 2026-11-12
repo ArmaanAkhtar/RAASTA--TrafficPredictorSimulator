@@ -104,73 +104,66 @@ export default function CameraModal() {
       aria-labelledby="camera-modal-title"
       className="fixed inset-0 z-[100] bg-[#0b1220] text-[#f6f2ea]"
     >
-      <div className="flex h-[100dvh] flex-col gap-3 overflow-y-auto p-3 sm:gap-4 sm:p-6">
-        <header className="flex shrink-0 items-start gap-3">
-          <div className="min-w-0 flex-1">
+      <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => void toggleFullscreen()}
+          className="raasta-button-secondary min-h-10 px-3 py-2 text-xs font-medium"
+        >
+          {fullscreen ? 'Exit full screen' : 'Enter full screen'}
+        </button>
+        <button
+          type="button"
+          onClick={close}
+          aria-label="Close camera view"
+          className="raasta-map-control"
+        >
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+            <path d="m6 6 12 12M18 6 6 18" />
+          </svg>
+        </button>
+      </div>
+
+      <main className="raasta-scroll flex h-full min-h-0 flex-col items-center overflow-y-auto px-4 pb-4 pt-20 sm:px-8 sm:pt-24">
+        <div className="my-auto flex w-full max-w-5xl shrink-0 flex-col items-center gap-4 py-16">
+          <header className="w-full text-center">
             <h2 id="camera-modal-title" className="truncate text-lg font-semibold sm:text-xl">
               {camera?.name ?? (loadError ? 'Camera unavailable' : 'Traffic camera')}
             </h2>
             <p className="mt-1 truncate text-sm text-[#8f9bb8]">
               {camera?.roadName || (camera ? 'Karachi' : loadError ? 'Camera details are unavailable.' : 'Loading camera details…')}
             </p>
+          </header>
+
+          <div className="aspect-video max-h-[58dvh] min-h-[240px] w-full overflow-hidden rounded-xl border border-[#1f2a44] shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
+            <RestrictedCameraScreen className="h-full w-full" />
           </div>
-          <button
-            type="button"
-            onClick={() => void toggleFullscreen()}
-            className="hidden shrink-0 rounded-lg border border-[#1f2a44] px-3 py-2 text-xs font-medium text-[#f6f2ea] transition-colors hover:border-[#7cc4ff] hover:text-[#7cc4ff] sm:inline-flex"
-          >
-            {fullscreen ? 'Exit full screen' : 'Enter full screen'}
-          </button>
-          <button
-            type="button"
-            onClick={close}
-            aria-label="Close camera view"
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-[#1f2a44] text-[#f6f2ea] transition-colors hover:border-[#7cc4ff] hover:text-[#7cc4ff]"
-          >
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-              <path d="m6 6 12 12M18 6 6 18" />
-            </svg>
-          </button>
-        </header>
 
-        <div className="flex min-h-[35vh] flex-1 flex-col overflow-hidden rounded-xl border border-[#1f2a44]">
-          <RestrictedCameraScreen className="min-h-[35vh] flex-1" />
-        </div>
-
-        {camera && (
-          <p className="shrink-0 text-xs tabular-nums text-[#8f9bb8]">
-            Map coordinates (m): {camera.position[0].toFixed(1)}, {camera.position[1].toFixed(1)}
-          </p>
-        )}
-
-        <section className="raasta-card shrink-0 p-4 sm:p-5" aria-labelledby="restricted-feed-title">
-          <h3 id="restricted-feed-title" className="text-sm font-semibold text-[#f6f2ea]">
-            Live feed restricted
-          </h3>
-          <p className="mt-2 max-w-4xl text-sm leading-relaxed text-[#8f9bb8]">
-            {RESTRICTED_FEED_MESSAGE}
-          </p>
-          {loadError && <p className="mt-2 text-xs text-[#8f9bb8]">{loadError}</p>}
-          {fullscreenMessage && <p className="mt-2 text-xs text-[#8f9bb8]">{fullscreenMessage}</p>}
-          <div className="mt-4 flex flex-wrap gap-2">
+          <section className="raasta-card w-full p-4 sm:p-5" aria-labelledby="restricted-feed-title">
+            <h3 id="restricted-feed-title" className="text-sm font-semibold text-[#f6f2ea]">
+              Live feed restricted
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-[#8f9bb8]">
+              {RESTRICTED_FEED_MESSAGE}
+            </p>
+            {camera && (
+              <p className="mt-2 text-xs tabular-nums text-[#8f9bb8]">
+                Map coordinates (m): {camera.position[0].toFixed(1)}, {camera.position[1].toFixed(1)}
+              </p>
+            )}
+            {loadError && <p className="mt-2 text-xs text-[#8f9bb8]">{loadError}</p>}
+            {fullscreenMessage && <p className="mt-2 text-xs text-[#8f9bb8]">{fullscreenMessage}</p>}
             <button
               type="button"
               onClick={showPrediction}
               disabled={!camera}
-              className="rounded-lg bg-[#7cc4ff] px-4 py-2.5 text-sm font-semibold text-[#0b1220] transition-colors hover:bg-[#a4d8ff] disabled:cursor-not-allowed disabled:opacity-50"
+              className="raasta-button-primary mt-4 px-4 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
             >
               See prediction for this road
             </button>
-            <button
-              type="button"
-              onClick={() => void toggleFullscreen()}
-              className="rounded-lg border border-[#1f2a44] px-4 py-2.5 text-sm font-medium text-[#f6f2ea] transition-colors hover:border-[#7cc4ff] hover:text-[#7cc4ff] sm:hidden"
-            >
-              {fullscreen ? 'Exit full screen' : 'Enter full screen'}
-            </button>
-          </div>
-        </section>
-      </div>
+          </section>
+        </div>
+      </main>
     </div>
   );
 }

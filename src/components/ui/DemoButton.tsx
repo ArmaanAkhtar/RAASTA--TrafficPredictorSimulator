@@ -62,8 +62,8 @@ export default function DemoButton({ iconOnly = false }: { iconOnly?: boolean } 
         aria-label={iconOnly ? (running ? 'Demo running' : 'Play demo') : undefined}
         title={iconOnly ? 'Play demo' : undefined}
         className={iconOnly
-          ? 'raasta-mobile-fab grid h-11 w-11 place-items-center rounded-full disabled:opacity-60'
-          : 'raasta-button-primary flex min-h-10 items-center gap-1.5 px-4 py-2 text-sm disabled:opacity-60'}
+          ? 'raasta-map-control max-md:!h-11 max-md:!w-11 max-md:!basis-11 disabled:opacity-60'
+          : 'raasta-map-control flex !h-10 !w-auto min-h-10 items-center gap-1.5 px-4 py-2 text-sm disabled:opacity-60'}
       >
         <svg viewBox="0 0 24 24" className={iconOnly ? 'h-5 w-5' : 'h-4 w-4'} fill="none" stroke="currentColor" strokeWidth={iconOnly ? '1.75' : '1.5'} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M8 5v14l11-7z" />

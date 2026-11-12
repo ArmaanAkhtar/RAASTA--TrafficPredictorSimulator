@@ -32,11 +32,13 @@ export function CameraList({
   cameras,
   detail,
   emptyText,
+  className = 'p-3',
 }: {
   title: string;
   cameras: CameraInfo[];
   detail?: (c: CameraInfo) => string;
   emptyText: string;
+  className?: string;
 }) {
   const openCamera = useAppStore((s) => s.openCamera);
   const activeCameraId = useAppStore((s) => s.activeCameraId);
@@ -44,7 +46,7 @@ export function CameraList({
   const shown = expanded ? cameras : cameras.slice(0, 4);
 
   return (
-    <div className="raasta-card p-3">
+    <div className={`raasta-card ${className}`}>
       <div className="mb-2 flex items-center gap-2">
         <CameraIcon className="h-4 w-4 text-[#7cc4ff]" />
         <p className="raasta-section-label flex-1">{title}</p>

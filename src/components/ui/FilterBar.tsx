@@ -17,7 +17,7 @@ export default function FilterBar() {
   const toggleFilter = useAppStore((s) => s.toggleFilter);
 
   return (
-    <div className="flex gap-2" role="group" aria-label="Filter roads by rush level">
+    <div className="flex w-full flex-nowrap gap-2" role="group" aria-label="Filter roads by rush level">
       {LEVELS.map(({ level, label }) => {
         const on = filter[level];
         return (
@@ -26,15 +26,15 @@ export default function FilterBar() {
             type="button"
             aria-pressed={on}
             onClick={() => toggleFilter(level)}
-            className={`flex min-h-10 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`flex min-h-9 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border bg-[#0f1729] px-2 py-1.5 text-xs font-medium transition-colors ${
               on
-                ? 'border-[#7cc4ff]/50 bg-[#7cc4ff]/10 text-[#f6f2ea]'
-                : 'border-[#1f2a44] bg-[#0f1729]/80 text-slate-500 line-through'
+                ? 'border-[#7cc4ff] text-[#f6f2ea]'
+                : 'border-[#1f2a44] text-[#8f9bb8]'
             }`}
           >
             <span
-              className="h-2 w-2 rounded-full"
-              style={{ backgroundColor: on ? LEVEL_COLOR[level] : '#475569' }}
+              className="h-2 w-2 shrink-0 rounded-full"
+              style={{ backgroundColor: LEVEL_COLOR[level] }}
             />
             {label}
           </button>

@@ -1,18 +1,26 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { Road } from '@/lib/types';
 import { useAppStore } from '@/store/useAppStore';
 import { useLocationStore } from '@/lib/location';
 import { useAreaStore } from '@/lib/area';
+import { projectLatLon } from '@/lib/projection';
 
 interface ControlsHandle {
   target: THREE.Vector3;
   enabled: boolean;
+  minDistance: number;
+  maxDistance: number;
+  maxPolarAngle: number;
   update: () => void;
+  addEventListener: (type: 'change', listener: () => void) => void;
+  removeEventListener: (type: 'change', listener: () => void) => void;
 }
+
+type MapControlAction = 'zoom-in' | 'zoom-out' | 'reset-view';
 
 /**
  * A camera flight. Instead of moving in a straight line (which looked jumpy), the camera
@@ -123,10 +131,49 @@ function offsetForPanel(view: { position: THREE.Vector3; target: THREE.Vector3 }
   view.position.add(offset);
 }
 
+function constrainCityView(
+  camera: THREE.PerspectiveCamera,
+  controls: ControlsHandle,
+  bounds: { center: THREE.Vector3; size: THREE.Vector3 },
+): () => void {
+  const margin = Math.max(2500, Math.max(bounds.size.x, bounds.size.z) * 0.06);
+  const fit = framedView(camera, bounds.center, bounds.size);
+  controls.minDistance = 1200;
+  controls.maxDistance = fit.position.distanceTo(bounds.center) * 1.05;
+  controls.maxPolarAngle = Math.PI / 2 - 0.05;
+
+  const clampTarget = () => {
+    const target = controls.target;
+    const x = THREE.MathUtils.clamp(
+      target.x,
+      bounds.center.x - bounds.size.x / 2 - margin,
+      bounds.center.x + bounds.size.x / 2 + margin,
+    );
+    const z = THREE.MathUtils.clamp(
+      target.z,
+      bounds.center.z - bounds.size.z / 2 - margin,
+      bounds.center.z + bounds.size.z / 2 + margin,
+    );
+    const dx = x - target.x;
+    const dy = -target.y;
+    const dz = z - target.z;
+    if (dx === 0 && dy === 0 && dz === 0) return;
+    target.set(x, 0, z);
+    camera.position.x += dx;
+    camera.position.y += dy;
+    camera.position.z += dz;
+  };
+
+  controls.addEventListener('change', clampTarget);
+  clampTarget();
+  return () => controls.removeEventListener('change', clampTarget);
+}
+
 export function CameraRig() {
   const camera = useThree((state) => state.camera) as THREE.PerspectiveCamera;
   const controls = useThree((state) => state.controls) as unknown as ControlsHandle | null;
   const roads = useAppStore((state) => state.roads);
+  const viewportSize = useThree((state) => state.size);
   const selectedRoadId = useAppStore((state) => state.selectedRoadId);
   const flyToken = useAppStore((state) => state.flyToken);
   const altRoute = useAppStore((state) => state.altRoute);
@@ -134,6 +181,7 @@ export function CameraRig() {
   const animation = useRef<AnimationState | null>(null);
   const controlsRef = useRef<ControlsHandle | null>(null);
   const initialFrameDone = useRef(false);
+  const introZoomStarted = useRef(false);
   const lastToken = useRef(flyToken);
   const gl = useThree((state) => state.gl);
   const lastDoubleClick = useRef(0);
@@ -145,6 +193,7 @@ export function CameraRig() {
   const areaPlace = useAreaStore((state) => state.cameraPlace);
   const placePanelOpen = useAreaStore((state) => state.place !== null);
   const lastAreaToken = useRef(areaFlyToken);
+  const cityBounds = useMemo(() => roadBoundingBox(roads), [roads]);
 
   useEffect(() => {
     controlsRef.current = controls;
@@ -152,6 +201,80 @@ export function CameraRig() {
       controlsRef.current = null;
     };
   }, [controls]);
+
+  useEffect(() => {
+    if (!controls || roads.length === 0) return;
+    return constrainCityView(camera, controls, cityBounds);
+  }, [camera, cityBounds, controls, roads.length, viewportSize.height, viewportSize.width]);
+
+  useEffect(() => {
+    if (!controls || roads.length === 0) return;
+    const startIntroZoom = () => {
+      if (introZoomStarted.current) return;
+      introZoomStarted.current = true;
+
+      const [x, y] = projectLatLon(24.865, 67.035);
+      const target = new THREE.Vector3(x, 0, -y);
+      const overview = framedView(camera, cityBounds.center, cityBounds.size);
+      const distance = THREE.MathUtils.clamp(
+        overview.position.distanceTo(cityBounds.center) * 0.22,
+        6500,
+        8500,
+      );
+      const phi = THREE.MathUtils.degToRad(40);
+      const theta = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target)).theta;
+      const cameraOffset = new THREE.Vector3().setFromSpherical(
+        new THREE.Spherical(distance, phi, theta),
+      );
+
+      if (window.innerWidth < 768) {
+        const screenUp = new THREE.Vector3(
+          Math.cos(phi) * Math.sin(theta),
+          0,
+          Math.cos(phi) * Math.cos(theta),
+        );
+        target.addScaledVector(screenUp, -distance * 0.16);
+      }
+
+      const destination = target.clone().add(cameraOffset);
+      const flight = makeFlight(camera.position, controls.target, destination, target);
+      flight.duration = 2.2;
+      animation.current = flight;
+    };
+
+    window.addEventListener('raasta-intro-complete', startIntroZoom);
+    return () => window.removeEventListener('raasta-intro-complete', startIntroZoom);
+  }, [camera, cityBounds, controls, roads.length]);
+
+  useEffect(() => {
+    if (!controls) return;
+    const handleMapControl = (event: Event) => {
+      const action = (event as CustomEvent<MapControlAction>).detail;
+      const target = controls.target.clone();
+      if (action === 'reset-view') {
+        const view = framedView(camera, cityBounds.center, cityBounds.size);
+        animation.current = makeFlight(camera.position, target, view.position, view.target);
+        return;
+      }
+      if (action !== 'zoom-in' && action !== 'zoom-out') return;
+      const offset = camera.position.clone().sub(target);
+      const multiplier = action === 'zoom-in' ? 0.78 : 1 / 0.78;
+      const distance = THREE.MathUtils.clamp(
+        offset.length() * multiplier,
+        controls.minDistance,
+        controls.maxDistance,
+      );
+      animation.current = makeFlight(
+        camera.position,
+        target,
+        target.clone().add(offset.setLength(distance)),
+        target,
+      );
+    };
+
+    window.addEventListener('raasta-map-control', handleMapControl);
+    return () => window.removeEventListener('raasta-map-control', handleMapControl);
+  }, [camera, cityBounds, controls, roads.length]);
 
   // Fit named areas to their boundary; points without a boundary get a close map view.
   useEffect(() => {

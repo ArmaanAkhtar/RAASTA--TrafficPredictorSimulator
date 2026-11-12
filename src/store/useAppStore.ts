@@ -3,6 +3,8 @@ import type { Road, RouteResult, RushLevel, SelectedTime } from '@/lib/types';
 
 interface AppState {
   roads: Road[];
+  sceneReady: boolean;
+  roadLoadError: string | null;
   selectedRoadId: string | null;
   selectedTime: SelectedTime;
   filter: Record<RushLevel, boolean>;
@@ -12,6 +14,8 @@ interface AppState {
   flyToken: number;
   lowGraphics: boolean;
   setRoads: (roads: Road[]) => void;
+  setRoadLoadError: (message: string | null) => void;
+  setSceneReady: (ready: boolean) => void;
   selectRoad: (id: string | null) => void;
   setTime: (time: SelectedTime) => void;
   toggleFilter: (level: RushLevel) => void;
@@ -24,6 +28,8 @@ interface AppState {
 
 export const useAppStore = create<AppState>((set) => ({
   roads: [],
+  sceneReady: false,
+  roadLoadError: null,
   selectedRoadId: null,
   selectedTime: { day: 3, hour: 16, minute: 0 }, // Wed 4:00 PM fixed default (avoids hydration mismatch)
   filter: { light: true, medium: true, heavy: true },
@@ -32,7 +38,9 @@ export const useAppStore = create<AppState>((set) => ({
   activeCameraId: null,
   flyToken: 0,
   lowGraphics: false,
-  setRoads: (roads) => set({ roads }),
+  setRoads: (roads) => set({ roads, sceneReady: false, roadLoadError: null }),
+  setRoadLoadError: (roadLoadError) => set({ roadLoadError }),
+  setSceneReady: (sceneReady) => set({ sceneReady }),
   selectRoad: (selectedRoadId) => set((state) => ({
     selectedRoadId,
     flyToken: state.flyToken + 1,

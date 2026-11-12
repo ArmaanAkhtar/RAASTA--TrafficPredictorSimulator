@@ -23,6 +23,12 @@ const ROAD_WIDTH: Record<Road['type'], number> = {
   local: 14 * VISUAL_WIDTH_SCALE,
 };
 
+const RUSH_BADGE_STYLE: Record<RushLevel, { backgroundColor: string; color: string }> = {
+  light: { backgroundColor: '#30a46c', color: '#ffffff' },
+  medium: { backgroundColor: '#f5a524', color: '#0b1220' },
+  heavy: { backgroundColor: '#e5484d', color: '#ffffff' },
+};
+
 /**
  * Road width follows the zoom: full (wide, easy to see) for the whole city, down to ~real width when you
  * zoom into the streets, so the galiyan next to a road stay visible. One shared value for every road,
@@ -383,14 +389,14 @@ const RoadRibbon = memo(function RoadRibbon({
         <Html
           position={[road.center[0], 180, -road.center[1]]}
           center
-          distanceFactor={2200}
+          zIndexRange={[60, 0]}
           style={{ pointerEvents: 'none' }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
-            <span style={{ background: 'rgba(15,23,41,.92)', border: '1px solid #1f2a44', borderRadius: 8, color: '#f6f2ea', padding: '4px 8px', fontSize: 12, fontWeight: 600 }}>
+            <span style={{ background: '#0f1729', border: '1px solid #1f2a44', borderRadius: 8, color: '#f6f2ea', padding: '7px 10px', fontSize: 15, fontWeight: 600 }}>
               {road.name}
             </span>
-            <span style={{ background: '#7cc4ff', borderRadius: 8, color: '#0b1220', padding: '4px 8px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>
+            <span style={{ ...RUSH_BADGE_STYLE[level], borderRadius: 8, padding: '5px 8px', fontSize: 12, fontWeight: 700, textTransform: 'uppercase' }}>
               {level}
             </span>
           </div>

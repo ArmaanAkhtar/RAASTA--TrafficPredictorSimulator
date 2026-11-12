@@ -70,11 +70,13 @@ function PlaceInput({
   value,
   onChange,
   options,
+  mobileEmbedded,
 }: {
   label: string;
   value: Place | null;
   onChange: (p: Place | null) => void;
   options: Place[];
+  mobileEmbedded: boolean;
 }) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -121,8 +123,12 @@ function PlaceInput({
 
   return (
     <div className="relative">
-      <label className="flex items-center gap-2 rounded-lg border border-[#1f2a44] bg-[#0b1220]/60 px-2.5 py-2 focus-within:border-[#7cc4ff]">
-        <span className="w-8 shrink-0 text-[11px] font-semibold uppercase text-slate-400">{label}</span>
+      <label className={`flex items-center gap-2 border border-[#1f2a44] focus-within:border-[#7cc4ff] ${
+        mobileEmbedded
+          ? 'h-12 rounded-[14px] bg-[#141d33] px-3'
+          : 'rounded-lg bg-[#0b1220]/60 px-2.5 py-2'
+      }`}>
+        <span className={`shrink-0 font-semibold uppercase text-slate-400 ${mobileEmbedded ? 'w-9 text-xs' : 'w-8 text-[11px]'}`}>{label}</span>
         <input
           ref={inputRef}
           value={value && !open ? value.name : query}
@@ -139,10 +145,11 @@ function PlaceInput({
           onBlur={() => setOpen(false)}
           onKeyDown={onKeyDown}
           placeholder={label === 'From' ? 'e.g. Gulshan-e-Iqbal' : 'e.g. Clifton'}
-          className="w-full min-w-0 bg-transparent text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
+          className={`w-full min-w-0 bg-transparent text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none ${mobileEmbedded ? 'pr-9' : ''}`}
           role="combobox"
           aria-label={`${label} place`}
           aria-expanded={shown}
+          aria-controls={`${label.toLowerCase()}-place-options`}
           aria-autocomplete="list"
         />
         {value && (
@@ -151,7 +158,7 @@ function PlaceInput({
             aria-label={`Clear ${label}`}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onChange(null)}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded text-slate-400 hover:text-slate-100"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-slate-400 hover:text-slate-100"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
               <path d="M6 6l12 12M18 6 6 18" />
@@ -160,7 +167,7 @@ function PlaceInput({
         )}
       </label>
       {shown && (
-        <ul role="listbox" className={`${GLASS} raasta-scroll absolute inset-x-0 top-full z-40 mt-1 max-h-[min(50dvh,24rem)] overflow-y-auto overscroll-contain py-1`}>
+        <ul id={`${label.toLowerCase()}-place-options`} role="listbox" className={`${GLASS} raasta-scroll absolute inset-x-0 top-full z-40 mt-1 max-h-[min(50dvh,24rem)] overflow-y-auto overscroll-contain py-1`}>
           {results.length === 0 && <li className="px-3 py-2 text-sm text-slate-400">No match</li>}
           {results.map((p, i) => (
             <li key={p.id} role="option" aria-selected={i === active}>
@@ -295,6 +302,20 @@ export default function TripPlanner({
   }, [current, active]);
 
   const onMap = current !== null && altRoute === current && showRoute;
+  const toggleRoute = () => {
+    if (!current) return;
+    if (onMap) {
+      useAppStore.getState().setShowRoute(false);
+    } else {
+      setActive(true);
+      const st = useAppStore.getState();
+      if (st.selectedRoadId !== null) st.selectRoad(null);
+      shownRoute.current = current;
+      useAppStore.getState().setAltRoute(current);
+      useAppStore.getState().setShowRoute(true);
+    }
+    onMapAction?.();
+  };
 
   return (
     <div
@@ -303,7 +324,7 @@ export default function TripPlanner({
       onWheelCapture={(event) => {
         if (plannerOpen) event.stopPropagation();
       }}
-      className={mobileEmbedded ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : `${GLASS} p-3 ${
+      className={mobileEmbedded ? 'flex min-h-0 flex-none flex-col overflow-hidden' : `${GLASS} p-3 ${
         plannerOpen
           ? `fixed inset-x-0 bottom-0 z-30 flex ${snapHeightClass} flex-col overflow-hidden pb-[env(safe-area-inset-bottom)] md:static md:h-auto md:max-h-none md:flex-none md:pb-3`
           : ''
@@ -344,21 +365,29 @@ export default function TripPlanner({
       </button>}
 
       {plannerOpen && (
-        <div className={`raasta-scroll min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain ${mobileEmbedded ? '' : 'mt-3'}`}>
-          <div className="flex items-stretch gap-2">
-            <div className="min-w-0 flex-1 space-y-2">
-              <PlaceInput label="From" value={from} onChange={setFrom} options={options} />
-              <PlaceInput label="To" value={to} onChange={setTo} options={options} />
+        <div className={`raasta-scroll min-h-0 overflow-y-auto overscroll-contain ${
+          mobileEmbedded
+            ? 'raasta-mobile-planner-scroll flex-none space-y-3 overflow-y-auto px-4 pb-4 pt-3'
+            : 'flex-1 space-y-2 mt-3'
+        }`}>
+          <div className={mobileEmbedded ? 'relative' : 'flex items-stretch gap-2'}>
+            <div className={mobileEmbedded ? 'min-w-0 space-y-2' : 'min-w-0 flex-1 space-y-2'}>
+              <PlaceInput label="From" value={from} onChange={setFrom} options={options} mobileEmbedded={mobileEmbedded} />
+              <PlaceInput label="To" value={to} onChange={setTo} options={options} mobileEmbedded={mobileEmbedded} />
             </div>
             <button
               type="button"
               aria-label="Swap From and To"
               onClick={swap}
-              className="raasta-button-secondary grid h-10 w-10 shrink-0 place-items-center text-slate-300"
+              className={mobileEmbedded
+                ? 'absolute -right-2 top-1/2 z-10 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full text-slate-300'
+                : 'raasta-button-secondary grid h-10 w-10 shrink-0 place-items-center text-slate-300'}
             >
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
-                <path d="M7 4v16m0 0-3-3m3 3 3-3M17 20V4m0 0 3 3m-3-3-3 3" />
-              </svg>
+              <span className="grid h-9 w-9 place-items-center rounded-full border border-[#1f2a44] bg-[#0f1729] shadow-[0_4px_12px_rgba(0,0,0,0.35)]">
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+                  <path d="M7 4v16m0 0-3-3m3 3 3-3M17 20V4m0 0 3 3m-3-3-3 3" />
+                </svg>
+              </span>
             </button>
           </div>
 
@@ -366,7 +395,7 @@ export default function TripPlanner({
             <button
               type="button"
               onClick={useMyLocation}
-              className="flex items-center gap-1.5 text-xs font-medium text-[#7cc4ff] hover:text-[#f6f2ea]"
+              className="flex min-h-11 items-center gap-1.5 text-xs font-medium text-[#7cc4ff] hover:text-[#f6f2ea]"
             >
               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
                 <path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z" />
@@ -380,7 +409,11 @@ export default function TripPlanner({
           )}
 
           {/* How you travel */}
-          <div role="radiogroup" aria-label="How you travel" className="grid grid-cols-3 gap-1 rounded-lg border border-[#1f2a44] bg-[#0b1220]/60 p-1">
+          <div role="radiogroup" aria-label="How you travel" className={`grid grid-cols-3 ${
+            mobileEmbedded
+              ? 'h-11 overflow-hidden rounded-[14px] border border-[#1f2a44] bg-[#0b1220]'
+              : 'gap-1 rounded-lg border border-[#1f2a44] bg-[#0b1220]/60 p-1'
+          }`}>
             {VEHICLES.map((v) => (
               <button
                 key={v.vehicle}
@@ -389,7 +422,7 @@ export default function TripPlanner({
                 aria-checked={vehicle === v.vehicle}
                 title={v.hint}
                 onClick={() => setVehicle(v.vehicle)}
-                className={`flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-md px-1 py-2 text-xs font-semibold transition-colors ${
+                className={`flex min-h-11 min-w-0 items-center justify-center gap-1.5 px-1 text-xs font-semibold transition-colors ${
                   vehicle === v.vehicle ? 'bg-[#7cc4ff] text-[#0b1220]' : 'text-slate-300 hover:bg-white/5'
                 }`}
               >
@@ -401,7 +434,11 @@ export default function TripPlanner({
 
           {/* Goal (not for walking: a walk is just the shortest way) */}
           {!walking && (
-          <div role="radiogroup" aria-label="Trip goal" className="grid grid-cols-2 gap-1 rounded-lg border border-[#1f2a44] bg-[#0b1220]/60 p-1">
+          <div role="radiogroup" aria-label="Trip goal" className={`grid grid-cols-2 ${
+            mobileEmbedded
+              ? 'h-11 overflow-hidden rounded-[14px] border border-[#1f2a44] bg-[#0b1220]'
+              : 'gap-1 rounded-lg border border-[#1f2a44] bg-[#0b1220]/60 p-1'
+          }`}>
             {MODES.map((m) => (
               <button
                 key={m.mode}
@@ -410,7 +447,7 @@ export default function TripPlanner({
                 aria-checked={mode === m.mode}
                 title={m.hint}
                 onClick={() => setMode(m.mode)}
-                className={`flex min-h-10 items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-semibold transition-colors ${
+                className={`flex min-h-11 items-center justify-center gap-1.5 text-xs font-semibold transition-colors ${
                   mode === m.mode ? 'bg-[#7cc4ff] text-[#0b1220]' : 'text-slate-300 hover:bg-white/10'
                 }`}
               >
@@ -426,7 +463,7 @@ export default function TripPlanner({
           {trips && current && (
             <div className="space-y-2">
               {walking ? (
-                <div className="rounded-lg border border-[#7cc4ff]/60 bg-[#7cc4ff]/10 p-2">
+                <div className={`border border-[#7cc4ff]/60 bg-[#7cc4ff]/10 ${mobileEmbedded ? 'rounded-[14px] p-4' : 'rounded-lg p-2'}`}>
                   <p className="text-[11px] text-slate-400">
                     <span className="inline-flex items-center gap-1.5">
                       <VehicleIcon vehicle="walk" /> Paidal (on foot)
@@ -445,7 +482,7 @@ export default function TripPlanner({
                       key={m.mode}
                       type="button"
                       onClick={() => setMode(m.mode)}
-                      className={`rounded-lg border p-2 text-left transition-colors ${
+                      className={`border text-left transition-colors ${mobileEmbedded ? 'min-h-24 rounded-[14px] p-4' : 'rounded-lg p-2'} ${
                         on ? 'border-[#7cc4ff]/60 bg-[#7cc4ff]/10' : 'border-[#1f2a44] bg-[#0f1729]/45 hover:bg-[#0f1729]/80'
                       }`}
                     >
@@ -470,22 +507,10 @@ export default function TripPlanner({
               <p className="text-[11px] text-slate-500">
                 {walking ? 'Trip details are in the panel on the right.' : 'Best time to leave is in the panel on the right.'}
               </p>
-              <div className="flex gap-2">
+              {!mobileEmbedded && <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    if (onMap) {
-                      useAppStore.getState().setShowRoute(false);
-                    } else {
-                      setActive(true);
-                      const st = useAppStore.getState();
-                      if (st.selectedRoadId !== null) st.selectRoad(null);
-                      shownRoute.current = current;
-                      useAppStore.getState().setAltRoute(current);
-                      useAppStore.getState().setShowRoute(true);
-                    }
-                    onMapAction?.();
-                  }}
+                  onClick={toggleRoute}
                   className="raasta-button-primary min-h-10 flex-1 py-1.5 text-xs"
                 >
                   {onMap ? 'Hide from map' : 'Show on map'}
@@ -497,9 +522,30 @@ export default function TripPlanner({
                 >
                   Clear
                 </button>
-              </div>
+              </div>}
+              {mobileEmbedded && (
+                <button
+                  type="button"
+                  onClick={clear}
+                  className="min-h-11 rounded-[14px] px-3 text-xs font-medium text-[#8f9bb8] hover:bg-white/5 hover:text-[#f6f2ea]"
+                >
+                  Clear trip
+                </button>
+              )}
             </div>
           )}
+        </div>
+      )}
+      {mobileEmbedded && (
+        <div className="z-10 shrink-0 border-t border-[#1f2a44] bg-[#0f1729] px-4 pb-3 pt-3">
+          <button
+            type="button"
+            onClick={toggleRoute}
+            disabled={!current}
+            className="raasta-button-primary h-12 w-full rounded-[14px] text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {onMap ? 'Hide from map' : 'Find route'}
+          </button>
         </div>
       )}
     </div>

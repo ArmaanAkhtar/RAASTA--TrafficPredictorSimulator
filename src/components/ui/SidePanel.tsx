@@ -168,7 +168,7 @@ export default function SidePanel({ mobileEmbedded = false }: { mobileEmbedded?:
       onWheelCapture={(event) => event.stopPropagation()}
       className={mobileEmbedded
         ? 'flex min-h-0 flex-1 flex-col overflow-hidden text-slate-100'
-        : `raasta-panel fixed inset-x-0 bottom-0 z-30 flex ${snapHeightClass} flex-col overflow-hidden pb-[env(safe-area-inset-bottom)] text-slate-100 transition-[height] duration-300 md:inset-x-auto md:bottom-4 md:right-4 md:top-4 md:h-auto md:max-h-[calc(100dvh-2rem)] md:w-[360px] md:pb-0`}
+        : `raasta-panel fixed inset-x-0 bottom-0 z-30 flex ${snapHeightClass} flex-col overflow-hidden pb-[env(safe-area-inset-bottom)] text-slate-100 transition-[height] duration-300 md:inset-x-auto md:bottom-4 md:right-4 md:top-4 md:h-auto md:max-h-[calc(100dvh-2rem)] md:w-[360px] md:pb-0 lg:w-[380px]`}
       aria-label={`Prediction for ${road.name}`}
     >
       {/* Mobile drag handle / collapse toggle */}
@@ -208,13 +208,13 @@ export default function SidePanel({ mobileEmbedded = false }: { mobileEmbedded?:
             <p className="raasta-section-label">Right now</p>
             <p className="mt-1 flex items-center gap-2 text-xl font-semibold">
               <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: LEVEL_COLOR[prediction.nowLevel] }} />
-              {LEVEL_LABEL[prediction.nowLevel]}
+              <span className="text-[22px] font-semibold">{LEVEL_LABEL[prediction.nowLevel]}</span>
             </p>
             <p className="text-xs text-slate-400">Rush score {prediction.nowScore}/100</p>
           </div>
           <div className="raasta-card p-3">
             <p className="raasta-section-label">Jam chance next hour</p>
-            <p className="mt-1 text-2xl font-bold tabular-nums" style={{ color: jamColor(jam) }}>
+            <p className="mt-1 text-[28px] font-bold tabular-nums" style={{ color: jamColor(jam) }}>
               {jam}%
             </p>
             <p className="text-xs text-slate-400">
