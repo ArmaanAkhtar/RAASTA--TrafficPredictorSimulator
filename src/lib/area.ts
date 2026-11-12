@@ -7,15 +7,23 @@ import type { Place } from './places';
 
 interface AreaState {
   place: Place | null;
+  cameraPlace: Place | null;
   /** bumped on every pick so the camera flies even to the same place again */
   flyToken: number;
   setPlace: (p: Place | null) => void;
+  flyTo: (p: Place) => void;
 }
 
 export const useAreaStore = create<AreaState>((set) => ({
   place: null,
+  cameraPlace: null,
   flyToken: 0,
-  setPlace: (place) => set((s) => ({ place, flyToken: place ? s.flyToken + 1 : s.flyToken })),
+  setPlace: (place) => set((state) => ({
+    place,
+    cameraPlace: place ?? state.cameraPlace,
+    flyToken: place ? state.flyToken + 1 : state.flyToken,
+  })),
+  flyTo: (place) => set((state) => ({ cameraPlace: place, flyToken: state.flyToken + 1 })),
 }));
 
 /** Place panel is showing (no road selected and a place picked). */

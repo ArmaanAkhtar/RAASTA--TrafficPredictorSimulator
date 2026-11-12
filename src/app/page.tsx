@@ -39,7 +39,7 @@ export default function Home() {
   }, [setRoads]);
 
   return (
-    <main className="relative h-dvh w-screen overflow-hidden bg-[#0b1220]">
+    <main className="relative h-dvh w-full overflow-hidden bg-[#0b1220]">
       <Scene />
       {layoutB ? <LayoutB /> : <LayoutA />}
     </main>

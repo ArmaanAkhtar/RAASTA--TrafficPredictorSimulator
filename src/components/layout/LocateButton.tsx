@@ -3,7 +3,7 @@
 import { LOCATION_MESSAGE, useLocationStore } from '@/lib/location';
 
 /** "My location" button: asks for location, shows the blue dot and flies the camera there. */
-export default function LocateButton() {
+export default function LocateButton({ iconOnly = false }: { iconOnly?: boolean } = {}) {
   const status = useLocationStore((s) => s.status);
   const locate = useLocationStore((s) => s.locate);
   const message = LOCATION_MESSAGE[status];
@@ -13,18 +13,24 @@ export default function LocateButton() {
       <button
         type="button"
         onClick={() => locate(true)}
-        aria-label="Show my location"
+        aria-label={iconOnly ? 'My location' : 'Show my location'}
         title="Show my location on the map"
-        className="flex items-center gap-1.5 rounded-full border border-white/10 bg-[#0b1220]/75 px-3 py-2 text-xs font-semibold text-slate-200 backdrop-blur-md hover:border-[#4da3ff]/60 hover:text-[#9cc9ff] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4da3ff]"
+        className={iconOnly
+          ? 'raasta-mobile-fab grid h-11 w-11 place-items-center rounded-full'
+          : 'raasta-button-secondary flex min-h-10 items-center gap-1.5 px-3 py-2 text-xs font-semibold hover:text-[#7cc4ff]'}
       >
-        <svg viewBox="0 0 24 24" className={`h-4 w-4 ${status === 'locating' ? 'animate-pulse' : ''}`} fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+        <svg viewBox="0 0 24 24" className={`${iconOnly ? 'h-5 w-5' : 'h-4 w-4'} ${status === 'locating' ? 'animate-pulse' : ''}`} fill="none" stroke="currentColor" strokeWidth={iconOnly ? '1.75' : '1.5'} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <circle cx="12" cy="12" r="3.5" />
           <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
           <circle cx="12" cy="12" r="7.5" />
         </svg>
-        My location
+        {!iconOnly && 'My location'}
       </button>
-      {message && status !== 'locating' && <p className="max-w-[260px] text-[11px] leading-snug text-amber-300/90">{message}</p>}
+      {message && status !== 'locating' && (
+        <p className={`${iconOnly ? 'sr-only' : 'max-w-[260px] text-[11px] leading-snug text-[#f6f2ea]/80'}`} role={iconOnly ? 'status' : undefined}>
+          {message}
+        </p>
+      )}
     </div>
   );
 }

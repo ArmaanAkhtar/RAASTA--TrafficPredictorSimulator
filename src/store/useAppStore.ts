@@ -5,7 +5,6 @@ interface AppState {
   roads: Road[];
   selectedRoadId: string | null;
   selectedTime: SelectedTime;
-  rain: boolean;
   filter: Record<RushLevel, boolean>;
   altRoute: RouteResult | null;
   showRoute: boolean;
@@ -15,7 +14,6 @@ interface AppState {
   setRoads: (roads: Road[]) => void;
   selectRoad: (id: string | null) => void;
   setTime: (time: SelectedTime) => void;
-  setRain: (rain: boolean) => void;
   toggleFilter: (level: RushLevel) => void;
   setAltRoute: (route: RouteResult | null) => void;
   setShowRoute: (show: boolean) => void;
@@ -28,7 +26,6 @@ export const useAppStore = create<AppState>((set) => ({
   roads: [],
   selectedRoadId: null,
   selectedTime: { day: 3, hour: 16, minute: 0 }, // Wed 4:00 PM fixed default (avoids hydration mismatch)
-  rain: false,
   filter: { light: true, medium: true, heavy: true },
   altRoute: null,
   showRoute: false,
@@ -43,7 +40,6 @@ export const useAppStore = create<AppState>((set) => ({
     showRoute: false,
   })),
   setTime: (selectedTime) => set({ selectedTime }),
-  setRain: (rain) => set({ rain }),
   toggleFilter: (level) => set((state) => ({
     filter: { ...state.filter, [level]: !state.filter[level] },
   })),

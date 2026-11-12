@@ -26,10 +26,10 @@ export default function FilterBar() {
             type="button"
             aria-pressed={on}
             onClick={() => toggleFilter(level)}
-            className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium backdrop-blur-md transition-colors ${
+            className={`flex min-h-10 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
               on
-                ? 'border-white/20 bg-[#0b1220]/80 text-slate-100'
-                : 'border-white/5 bg-[#0b1220]/50 text-slate-500 line-through'
+                ? 'border-[#7cc4ff]/50 bg-[#7cc4ff]/10 text-[#f6f2ea]'
+                : 'border-[#1f2a44] bg-[#0f1729]/80 text-slate-500 line-through'
             }`}
           >
             <span

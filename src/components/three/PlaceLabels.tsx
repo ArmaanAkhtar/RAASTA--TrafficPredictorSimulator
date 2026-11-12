@@ -10,7 +10,7 @@ import { useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useAreaStore } from '@/lib/area';
 import { useAllPlaces } from '@/lib/osmPlaces';
-import { CAT_ICON, type Place } from '@/lib/places';
+import type { Place } from '@/lib/places';
 import { useTripStore } from '@/lib/trip';
 import { useAppStore } from '@/store/useAppStore';
 
@@ -83,10 +83,15 @@ export function PlaceLabels() {
                 ? 'text-[13px] font-bold uppercase tracking-wide text-slate-100'
                 : p.kind === 'block'
                   ? 'text-[11px] font-semibold text-slate-300'
-                  : 'text-[11px] font-medium text-[#ffd59a]'
+                  : 'text-[11px] font-medium text-[#f6f2ea]'
             }`}
           >
-            {p.kind === 'landmark' && <span aria-hidden>{(p.cat && CAT_ICON[p.cat]) || '📍'} </span>}
+            {p.kind === 'landmark' && (
+              <svg viewBox="0 0 24 24" className="mr-0.5 inline h-3.5 w-3.5 text-[#7cc4ff]" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+                <path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z" />
+                <circle cx="12" cy="10" r="2.5" />
+              </svg>
+            )}
             {p.kind === 'block' ? p.name.split(',')[0] : p.name}
           </button>
         </Html>

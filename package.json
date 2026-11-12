@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "data": "tsx scripts/fetch-osm.ts && tsx scripts/build-roads.ts && tsx scripts/build-graph.ts && tsx scripts/build-streets.ts && tsx scripts/build-places.ts && tsx scripts/build-cameras.ts"
+    "data": "tsx scripts/fetch-osm.ts && tsx scripts/build-roads.ts && tsx scripts/build-streets.ts && tsx scripts/build-graph.ts && tsx scripts/build-places.ts && tsx scripts/build-cameras.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

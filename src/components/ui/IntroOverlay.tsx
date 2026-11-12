@@ -39,15 +39,15 @@ export default function IntroOverlay() {
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#0b1220]/80 p-4 backdrop-blur-md">
-      <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#0b1220] p-6 text-slate-100 shadow-2xl">
-        <p className="text-xs font-medium uppercase tracking-[0.2em] text-slate-400">Karachi Traffic Intelligence</p>
-        <h1 className="mt-1 text-4xl font-bold text-[#ffb547]">Raasta</h1>
+      <div className="raasta-panel w-full max-w-md p-6 text-slate-100">
+        <p className="raasta-section-label">Karachi Traffic Intelligence</p>
+        <h1 className="mt-1 text-3xl font-semibold text-[#f6f2ea]">Raasta</h1>
         <p className="mt-2 text-lg text-slate-200">Know the rush before you leave.</p>
 
         <ol className="mt-6 space-y-4">
           {STEPS.map((s, i) => (
             <li key={s.title} className="flex gap-3">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#ffb547]/15 text-sm font-semibold text-[#ffb547]">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#7cc4ff]/10 text-sm font-semibold text-[#7cc4ff]">
                 {i + 1}
               </span>
               <span>
@@ -62,7 +62,7 @@ export default function IntroOverlay() {
           type="button"
           onClick={close}
           autoFocus
-          className="mt-7 w-full rounded-xl bg-[#ffb547] py-3 font-semibold text-[#0b1220] transition-transform hover:scale-[1.01] active:scale-[0.99]"
+          className="raasta-button-primary mt-7 w-full py-3"
         >
           Start
         </button>

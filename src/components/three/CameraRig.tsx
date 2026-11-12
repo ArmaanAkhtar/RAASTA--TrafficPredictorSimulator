@@ -90,8 +90,7 @@ function framedView(
   const fovHalfRadians = THREE.MathUtils.degToRad(camera.fov * 0.5);
   const aspect = Math.max(camera.aspect, 0.1);
   const limitingHalfFov = Math.min(fovHalfRadians, Math.atan(Math.tan(fovHalfRadians) * aspect));
-  // Stay inside MapControls' maxDistance (42000), otherwise the controls snap the camera to an odd angle
-  const distance = THREE.MathUtils.clamp(radius / Math.max(Math.sin(limitingHalfFov), 0.1), 1200, 38000);
+  const distance = Math.max(1200, radius / Math.max(Math.sin(limitingHalfFov), 0.1));
   const direction = new THREE.Vector3(0.707, 0.707, -0.707).normalize();
   return { position: center.clone().add(direction.multiplyScalar(distance)), target: center };
 }
@@ -133,6 +132,7 @@ export function CameraRig() {
   const altRoute = useAppStore((state) => state.altRoute);
   const showRoute = useAppStore((state) => state.showRoute);
   const animation = useRef<AnimationState | null>(null);
+  const controlsRef = useRef<ControlsHandle | null>(null);
   const initialFrameDone = useRef(false);
   const lastToken = useRef(flyToken);
   const gl = useThree((state) => state.gl);
@@ -142,18 +142,36 @@ export function CameraRig() {
   const userPoint = useLocationStore((state) => state.point);
   const lastLocationToken = useRef(locationFlyToken);
   const areaFlyToken = useAreaStore((state) => state.flyToken);
-  const areaPlace = useAreaStore((state) => state.place);
+  const areaPlace = useAreaStore((state) => state.cameraPlace);
+  const placePanelOpen = useAreaStore((state) => state.place !== null);
   const lastAreaToken = useRef(areaFlyToken);
 
-  // A place picked in search: glide there, wide enough to see the cameras around it
+  useEffect(() => {
+    controlsRef.current = controls;
+    return () => {
+      controlsRef.current = null;
+    };
+  }, [controls]);
+
+  // Fit named areas to their boundary; points without a boundary get a close map view.
   useEffect(() => {
     if (areaFlyToken === lastAreaToken.current || !areaPlace) return;
     lastAreaToken.current = areaFlyToken;
-    const target = new THREE.Vector3(areaPlace.point[0], 0, -areaPlace.point[1]);
+    const [minX, minY, maxX, maxY] = areaPlace.bbox ?? [
+      areaPlace.point[0] - 1000,
+      areaPlace.point[1] - 750,
+      areaPlace.point[0] + 1000,
+      areaPlace.point[1] + 750,
+    ];
+    const box = {
+      center: new THREE.Vector3((minX + maxX) / 2, 0, -(minY + maxY) / 2),
+      size: new THREE.Vector3(Math.max(maxX - minX, 1000), 0, Math.max(maxY - minY, 1000)),
+    };
+    const view = framedView(camera, box.center, box.size);
+    if (placePanelOpen) offsetForPanel(view, box.size);
     const fromTarget = controls?.target ?? new THREE.Vector3();
-    const offset = camera.position.clone().sub(fromTarget).setLength(7000);
-    animation.current = makeFlight(camera.position, fromTarget, target.clone().add(offset), target);
-  }, [areaFlyToken, areaPlace, camera, controls]);
+    animation.current = makeFlight(camera.position, fromTarget, view.position, view.target);
+  }, [areaFlyToken, areaPlace, camera, controls, placePanelOpen]);
 
   // "My location": glide to the blue dot, close enough to see the nearby roads
   useEffect(() => {
@@ -277,8 +295,9 @@ export function CameraRig() {
   useFrame((_, delta) => {
     const flight = animation.current;
     if (!flight) return;
+    const activeControls = controlsRef.current;
     // Controls off while flying, so their damping does not fight the animation
-    if (controls) controls.enabled = false;
+    if (activeControls) activeControls.enabled = false;
     flight.elapsed += Math.min(delta, 1 / 30);
     const t = THREE.MathUtils.clamp(flight.elapsed / flight.duration, 0, 1);
     const e = easeInOutCubic(t);
@@ -289,15 +308,15 @@ export function CameraRig() {
     const theta = THREE.MathUtils.lerp(flight.fromSph.theta, flight.toSph.theta, e);
     camera.position.setFromSphericalCoords(radius, phi, theta).add(target);
 
-    if (controls) {
-      controls.target.copy(target);
-      controls.update();
+    if (activeControls) {
+      activeControls.target.copy(target);
+      activeControls.update();
     }
     camera.lookAt(target);
 
     if (t >= 1) {
       animation.current = null;
-      if (controls) controls.enabled = true;
+      if (activeControls) activeControls.enabled = true;
     }
   });
 

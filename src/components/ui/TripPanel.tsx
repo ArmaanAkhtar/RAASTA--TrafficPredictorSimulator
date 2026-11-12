@@ -4,7 +4,7 @@
 // No props: reads the app store and the trip store.
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Bar, BarChart, Cell, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 import { LEVEL_COLOR } from '../../lib/api';
 import { planDeparture, type DepartureSlot } from '../../lib/departure';
@@ -12,7 +12,7 @@ import { useLocationStore } from '../../lib/location';
 import type { Place } from '../../lib/places';
 import type { TripMode } from '../../lib/routing';
 import { MY_LOCATION_ID, tripKey, useTripStore } from '../../lib/trip';
-import { formatWalk, VEHICLES } from './TripPlanner';
+import { formatWalk, VehicleIcon } from './TripPlanner';
 import type { Pt } from '../../lib/types';
 import { useAppStore } from '../../store/useAppStore';
 import { formatTime } from './TimePicker';
@@ -20,9 +20,10 @@ import { CameraList, useCameras } from './CameraList';
 import { camerasAlongRoute } from '../../lib/cameras';
 import { useRoadGraph } from '../../lib/roadGraphStore';
 import { useSettledValue } from '../three/usePerformance';
+import { useMobileSheet } from './useMobileSheet';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MODE_LABEL: Record<TripMode, string> = { time: '⏱ Time save', petrol: '⛽ Petrol save' };
+const MODE_LABEL: Record<TripMode, string> = { time: 'Time save', petrol: 'Petrol save' };
 
 const pointOf = (p: Place | null, user: Pt | null): Pt | null => (p ? (p.id === MY_LOCATION_ID ? user : p.point) : null);
 
@@ -45,11 +46,10 @@ function inText(minutes: number): string {
   return `in ${h} h${m ? ` ${m} min` : ''}`;
 }
 
-export default function TripPanel() {
+export default function TripPanel({ mobileEmbedded = false }: { mobileEmbedded?: boolean } = {}) {
   const roads = useAppStore((s) => s.roads);
   const selectedRoadId = useAppStore((s) => s.selectedRoadId);
   const selectedTime = useAppStore((s) => s.selectedTime);
-  const rain = useAppStore((s) => s.rain);
   const setTime = useAppStore((s) => s.setTime);
 
   const from = useTripStore((s) => s.from);
@@ -63,7 +63,7 @@ export default function TripPanel() {
   const setActive = useTripStore((s) => s.setActive);
   const userPoint = useLocationStore((s) => s.point);
 
-  const [collapsed, setCollapsed] = useState(false); // mobile only
+  const { snapPoint, snapHeightClass, handleProps } = useMobileSheet();
   const allCameras = useCameras();
 
   const fromPoint = pointOf(from, userPoint);
@@ -77,10 +77,10 @@ export default function TripPanel() {
   const graphVersion = useRoadGraph((s) => s.version);
   const plan = useMemo(() => {
     if (!visible || !fromPoint || !toPoint) return null;
-    return planDeparture(roads, fromPoint, toPoint, settledTime, rain, mode, vehicle);
+    return planDeparture(roads, fromPoint, toPoint, settledTime, mode, vehicle);
     // graphVersion: re-plan when the directed graph arrives
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, roads, fromPoint, toPoint, settledTime, rain, mode, vehicle, graphVersion]);
+  }, [visible, roads, fromPoint, toPoint, settledTime, mode, vehicle, graphVersion]);
 
   const nameOf = useMemo(() => new Map(roads.map((r) => [r.id, r.name])), [roads]);
   const routeCameras = useMemo(
@@ -107,68 +107,70 @@ export default function TripPanel() {
 
   return (
     <aside
-      className={`fixed inset-x-0 bottom-0 z-30 flex flex-col overflow-hidden rounded-t-2xl border border-white/10 bg-[#0b1220]/85 text-slate-100 shadow-2xl backdrop-blur-md transition-[max-height] duration-300 md:inset-x-auto md:bottom-4 md:right-4 md:top-4 md:max-h-none md:w-[360px] md:rounded-2xl ${
-        collapsed ? 'max-h-[76px]' : 'max-h-[75vh]'
-      }`}
+      data-mobile-sheet={!mobileEmbedded || undefined}
+      data-sheet-snap={mobileEmbedded ? undefined : snapPoint}
+      onWheelCapture={(event) => event.stopPropagation()}
+      className={mobileEmbedded
+        ? 'flex min-h-0 flex-1 flex-col overflow-hidden text-slate-100'
+        : `raasta-panel fixed inset-x-0 bottom-0 z-30 flex ${snapHeightClass} flex-col overflow-hidden pb-[env(safe-area-inset-bottom)] text-slate-100 transition-[height] duration-300 md:inset-x-auto md:bottom-4 md:right-4 md:top-4 md:h-auto md:max-h-[calc(100dvh-2rem)] md:w-[360px] md:pb-0`}
       aria-label={`Trip from ${from.name} to ${to.name}`}
     >
       {/* Mobile drag handle */}
-      <button
+      {!mobileEmbedded && <button
         type="button"
-        onClick={() => setCollapsed((c) => !c)}
-        className="flex w-full justify-center pt-2 md:hidden"
-        aria-label={collapsed ? 'Expand panel' : 'Collapse panel'}
+        {...handleProps}
+        className="flex min-h-10 w-full shrink-0 touch-none items-center justify-center md:hidden"
+        aria-label={`Resize panel, currently ${snapPoint}`}
       >
         <span className="h-1 w-10 rounded-full bg-white/25" />
-      </button>
+      </button>}
 
       {/* Header */}
-      <div className="flex items-start gap-3 px-4 pb-3 pt-2 md:pt-4">
+      <div className={`flex shrink-0 items-start gap-3 px-4 pb-3 ${mobileEmbedded ? 'pt-0' : 'pt-2 md:pt-4'}`}>
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-[#7cc4ff]">Your trip · {VEHICLES.find((v) => v.vehicle === vehicle)?.icon} {walking ? 'Paidal' : MODE_LABEL[mode]}
+          <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#7cc4ff]">Your trip · <VehicleIcon vehicle={vehicle} /> {walking ? 'Paidal' : MODE_LABEL[mode]}
           </p>
-          <h2 className="truncate text-base font-semibold">
+          <h2 className={`truncate ${mobileEmbedded ? 'text-[17px]' : 'text-base'} font-semibold`}>
             {from.name} → {to.name}
           </h2>
           <p className="text-xs text-slate-400">
             Leaving {DAYS[selectedTime.day]} {formatTime(selectedTime.hour, selectedTime.minute)}
-            {rain ? ' · rain' : ''}
           </p>
         </div>
         <button
           type="button"
           onClick={() => setActive(false)}
           aria-label="Close trip"
-          className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-slate-100"
+          className={`grid ${mobileEmbedded ? 'h-11 w-11 rounded-[14px]' : 'h-10 w-10 rounded-lg'} shrink-0 place-items-center text-slate-400 hover:bg-white/10 hover:text-slate-100`}
         >
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.5">
             <path d="M6 6l12 12M18 6 6 18" />
           </svg>
         </button>
       </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto px-4 pb-4">
+      <div className="raasta-scroll min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 pb-4">
         {/* Now */}
         <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-xl bg-white/5 p-2.5">
-            <p className="text-[11px] text-slate-400">Time</p>
+          <div className="raasta-card p-2.5">
+            <p className="raasta-section-label">Time</p>
             <p className="text-lg font-bold tabular-nums">{walking ? formatWalk(current.minutes) : `${current.minutes} min`}</p>
           </div>
-          <div className="rounded-xl bg-white/5 p-2.5">
-            <p className="text-[11px] text-slate-400">Distance</p>
+          <div className="raasta-card p-2.5">
+            <p className="raasta-section-label">Distance</p>
             <p className="text-lg font-bold tabular-nums">{current.distanceKm} km</p>
             <p className="text-[11px] tabular-nums text-slate-500">
               {walking ? 'no petrol' : `${current.fuelLitres.toFixed(1)} L petrol`}
             </p>
           </div>
           {walking ? (
-            <div className="rounded-xl bg-white/5 p-2.5">
-              <p className="text-[11px] text-slate-400">Steps</p>
+            <div className="raasta-card p-2.5">
+              <p className="raasta-section-label">Steps</p>
               <p className="text-lg font-bold tabular-nums">~{Math.round(current.distanceKm * 1.3)}k</p>
             </div>
           ) : (
-            <div className="rounded-xl bg-white/5 p-2.5">
-              <p className="text-[11px] text-slate-400">Jam chance</p>
+            <div className="raasta-card p-2.5">
+              <p className="raasta-section-label">Jam chance</p>
               <p className="text-lg font-bold tabular-nums" style={{ color: jamColour(current.jamChance) }}>
                 {current.jamChance}%
               </p>
@@ -188,10 +190,10 @@ export default function TripPanel() {
         {(advice.kind === 'wait' || advice.kind === 'better-later') && advice.slot.trip && (
           <div
             className={`rounded-xl border p-3 ${
-              advice.kind === 'wait' ? 'border-[#30a46c]/40 bg-[#30a46c]/10' : 'border-[#f5a524]/40 bg-[#f5a524]/10'
+              advice.kind === 'wait' ? 'border-[#30a46c]/40 bg-[#30a46c]/10' : 'border-[#7cc4ff]/30 bg-[#7cc4ff]/5'
             }`}
           >
-            <p className={`text-sm font-semibold ${advice.kind === 'wait' ? 'text-[#5fd497]' : 'text-[#f5c063]'}`}>
+            <p className={`text-sm font-semibold ${advice.kind === 'wait' ? 'text-[#5fd497]' : 'text-[#7cc4ff]'}`}>
               {advice.kind === 'wait'
                 ? `Traffic-free at ${leaveAt(advice.slot)} (${inText(advice.slot.offsetMin)})`
                 : `Traffic eases at ${leaveAt(advice.slot)} (${inText(advice.slot.offsetMin)})`}
@@ -214,7 +216,7 @@ export default function TripPanel() {
 
         {advice.kind === 'walk' && (
           <div className="rounded-xl border border-[#7cc4ff]/40 bg-[#7cc4ff]/10 p-3">
-            <p className="text-sm font-semibold text-[#9cc9ff]">Walking: traffic will not slow you down</p>
+            <p className="text-sm font-semibold text-[#7cc4ff]">Walking: traffic will not slow you down</p>
             <p className="mt-1 text-xs text-slate-300">
               About {formatWalk(current.minutes)} at a normal pace. The route stays off expressways and may use either side of
               one-way roads.
@@ -224,8 +226,8 @@ export default function TripPanel() {
         )}
 
         {advice.kind === 'steady' && (
-          <div className="rounded-xl border border-[#f5a524]/40 bg-[#f5a524]/10 p-3">
-            <p className="text-sm font-semibold text-[#f5c063]">
+          <div className="rounded-xl border border-[#7cc4ff]/30 bg-[#7cc4ff]/5 p-3">
+            <p className="text-sm font-semibold text-[#7cc4ff]">
               {advice.worsens ? 'Leave now: it gets busier later' : 'Busy but moving for the next 2 hours'}
             </p>
             <p className="mt-1 text-xs text-slate-300">
@@ -238,7 +240,7 @@ export default function TripPanel() {
 
         {advice.kind === 'jammed' && (
           <div className="rounded-xl border border-[#e5484d]/40 bg-[#e5484d]/10 p-3">
-            <p className="text-sm font-semibold text-[#ff8a8d]">This route stays jammed for the next 2 hours</p>
+            <p className="text-sm font-semibold text-[#e5484d]">This route stays jammed for the next 2 hours</p>
             <p className="mt-1 text-xs text-slate-300">
               Leaving later will not help much. Pick what matters more to you:
             </p>
@@ -251,7 +253,7 @@ export default function TripPanel() {
                     key={m}
                     type="button"
                     onClick={() => setMode(m)}
-                    className={`rounded-lg border p-2 text-left ${on ? 'border-[#7cc4ff]/60 bg-[#7cc4ff]/10' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+                    className={`rounded-lg border p-2 text-left ${on ? 'border-[#7cc4ff]/60 bg-[#7cc4ff]/10' : 'border-[#1f2a44] bg-[#0f1729]/45 hover:bg-[#0f1729]/80'}`}
                   >
                     <p className="text-[11px] text-slate-400">{MODE_LABEL[m]}</p>
                     {tr ? (
@@ -273,7 +275,7 @@ export default function TripPanel() {
 
         {/* Next 2 hours (not for walking: traffic does not change a walk) */}
         {!walking && (
-        <div className="rounded-xl bg-white/5 p-3">
+        <div className="raasta-card p-3">
           <div className="mb-2 flex items-baseline justify-between">
             <p className="text-xs text-slate-400">If you leave at… (next 2 hours)</p>
             <p className="text-[10px] text-slate-500">minutes</p>
@@ -297,7 +299,7 @@ export default function TripPanel() {
             </ResponsiveContainer>
           </div>
           <p className="mt-1 text-[10px] text-slate-500">
-            Green = traffic-free · amber = busy · red = jam likely · white outline = suggested time
+            Green = traffic-free · medium rush = busy · red = jam likely · white outline = suggested time
           </p>
         </div>
         )}
@@ -317,7 +319,7 @@ export default function TripPanel() {
           <button
             type="button"
             onClick={() => setMode(other)}
-            className="w-full rounded-xl border border-white/10 bg-white/5 p-2.5 text-left text-xs text-slate-300 hover:bg-white/10"
+            className="raasta-button-secondary w-full p-2.5 text-left text-xs text-slate-300"
           >
             {MODE_LABEL[other]} instead: {otherTrip.minutes} min · {otherTrip.distanceKm} km · {otherTrip.fuelLitres.toFixed(1)} L
           </button>

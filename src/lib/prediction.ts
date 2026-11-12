@@ -1,7 +1,7 @@
 // src/lib/prediction.ts
 // The prediction "brain". Pure and synchronous: no fetch, no React.
 //
-// score(time) = base(time) x dayFactor x capacityFactor + rainBoost + jitter, clamped 0-100
+// score(time) = base(time) x dayFactor x capacityFactor + jitter, clamped 0-100
 // jamChanceNextHour = logistic(score one hour later)
 import type { HourPoint, Prediction, Road, RoadType, RushLevel, SelectedTime } from './types';
 import { RUSH_PROFILES, type HourlyProfile } from './rushProfiles';
@@ -25,9 +25,6 @@ export const CONFIG = {
 
   // Narrower roads choke faster
   capacityFactor: { highway: 1.0, arterial: 1.04, local: 0.96 } satisfies Record<RoadType, number>,
-
-  // Points added when it rains (Karachi roads flood, local roads worst)
-  rainBoost: { highway: 14, arterial: 18, local: 22 } satisfies Record<RoadType, number>,
 
   // Stable per-road random offset (+/- this many points) so same-type roads differ
   jitter: 6,
@@ -93,13 +90,12 @@ function dayFactorAt(day: number, t: number): number {
 }
 
 /** Raw (unrounded) score for a road at a given day and fractional hour. */
-function scoreAt(road: Road, day: number, t: number, rain: boolean): number {
+function scoreAt(road: Road, day: number, t: number): number {
   const { profile, named } = profileFor(road);
   const base = baseAt(profile, t);
   const jitterRange = CONFIG.jitter * (named ? CONFIG.jitterScaleForNamedRoads : 1);
   const jitter = (hash01(road.id) * 2 - 1) * jitterRange;
-  const rainBoost = rain ? CONFIG.rainBoost[road.type] : 0;
-  const s = base * dayFactorAt(day, t) * CONFIG.capacityFactor[road.type] + rainBoost + jitter;
+  const s = base * dayFactorAt(day, t) * CONFIG.capacityFactor[road.type] + jitter;
   return clamp(s, 0, 100);
 }
 
@@ -110,11 +106,11 @@ function jamChance(score: number): number {
 // ---------------------------------------------------------------------------
 // Public API (matches the shared contract)
 // ---------------------------------------------------------------------------
-export function predict(road: Road, t: SelectedTime, rain: boolean): Prediction {
+export function predict(road: Road, t: SelectedTime): Prediction {
   const day = normDay(t.day);
   const now = clamp(t.hour + t.minute / 60, 0, 23.999);
 
-  const nowScore = Math.round(scoreAt(road, day, now, rain));
+  const nowScore = Math.round(scoreAt(road, day, now));
 
   // One hour later (may roll over into the next day)
   let nextT = now + 1;
@@ -123,11 +119,11 @@ export function predict(road: Road, t: SelectedTime, rain: boolean): Prediction 
     nextT -= 24;
     nextDay = (day + 1) % 7;
   }
-  const nextScore = scoreAt(road, nextDay, nextT, rain);
+  const nextScore = scoreAt(road, nextDay, nextT);
 
   const hourly: HourPoint[] = [];
   for (let h = 0; h < 24; h++) {
-    const score = Math.round(scoreAt(road, day, h, rain));
+    const score = Math.round(scoreAt(road, day, h));
     hourly.push({ hour: h, score, level: levelOf(score) });
   }
 

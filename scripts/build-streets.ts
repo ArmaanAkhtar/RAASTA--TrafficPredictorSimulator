@@ -7,12 +7,13 @@
  *   Input:  scripts/data/karachi_streets.json   { v: 1, ways: [[lon, lat, lon, lat, ...], ...] }
  *   Output: public/data/streets.bin
  *
- * Format of streets.bin (little-endian Int16, local metres, 1 m precision):
+ * Format of streets.bin (little-endian Int32, local metres, 1 m precision):
  *   [n, x0, y0, x1, y1, ... x(n-1), y(n-1),   n, x0, y0, ...]   one polyline after another
  * Uses only Node built-ins.
  */
 import * as fs from 'fs';
 import * as path from 'path';
+import { projectLatLon } from './bbox';
 
 type Pt = [number, number];
 
@@ -20,15 +21,11 @@ const ROOT = process.cwd();
 const IN_FILE = path.join(ROOT, 'scripts', 'data', 'karachi_streets.json');
 const OUT_FILE = path.join(ROOT, 'public', 'data', 'streets.bin');
 
-const LAT0 = 24.8607;
-const LON0 = 67.0011;
-const M_PER_DEG_LON = 111320 * Math.cos((LAT0 * Math.PI) / 180);
-const M_PER_DEG_LAT = 110540;
-const project = (lon: number, lat: number): Pt => [(lon - LON0) * M_PER_DEG_LON, (lat - LAT0) * M_PER_DEG_LAT];
+const project = (lon: number, lat: number): Pt => projectLatLon(lat, lon);
 
-const SIMPLIFY_M = 2; // drop points that bend the street by less than 2 m
-const MAX_POINTS = 30000; // per polyline (fits the Int16 count)
-const LIMIT = 32767;
+const SIMPLIFY_M = 12;
+const MAX_POINTS = 30000;
+const FILE_MAGIC = 0x53545232; // STR2
 
 /** Douglas-Peucker */
 function simplify(pts: Pt[], tol: number): Pt[] {
@@ -101,23 +98,19 @@ function main() {
     rawPoints += pts.length;
     for (let i = 1; i < pts.length; i++) totalM += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
 
-    // simplify, round to whole metres, drop repeats; split where a point is outside the Int16 range
+    // simplify, round to whole metres and drop repeats
     let line: Pt[] = [];
     for (const [x, y] of simplify(pts, SIMPLIFY_M)) {
       const p: Pt = [Math.round(x), Math.round(y)];
-      if (Math.abs(p[0]) > LIMIT || Math.abs(p[1]) > LIMIT) {
-        flush(line);
-        line = [];
-        continue;
-      }
       const last = line[line.length - 1];
       if (!last || last[0] !== p[0] || last[1] !== p[1]) line.push(p);
     }
     flush(line);
   }
 
-  const buf = Buffer.alloc(out.length * 2);
-  out.forEach((v, i) => buf.writeInt16LE(v, i * 2));
+  const buf = Buffer.alloc((out.length + 1) * 4);
+  buf.writeInt32LE(FILE_MAGIC, 0);
+  out.forEach((v, i) => buf.writeInt32LE(v, (i + 1) * 4));
   fs.mkdirSync(path.dirname(OUT_FILE), { recursive: true });
   fs.writeFileSync(OUT_FILE, buf);
 

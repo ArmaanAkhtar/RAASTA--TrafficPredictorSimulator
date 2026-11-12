@@ -1,5 +1,5 @@
 // src/components/ui/TimePicker.tsx
-// Day chips, 15-minute time slider, "Now" button and rain toggle. No props.
+// Day chips, 15-minute time slider and "Now" button. No props.
 'use client';
 
 import { useSyncExternalStore } from 'react';
@@ -14,7 +14,7 @@ function useIsClient(): boolean {
 }
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const GLASS = 'rounded-2xl border border-white/10 bg-[#0b1220]/75 shadow-xl backdrop-blur-md';
+const GLASS = 'raasta-panel';
 
 export function formatTime(hour: number, minute: number): string {
   const ampm = hour < 12 ? 'AM' : 'PM';
@@ -22,16 +22,14 @@ export function formatTime(hour: number, minute: number): string {
   return `${h12}:${String(minute).padStart(2, '0')} ${ampm}`;
 }
 
-export default function TimePicker() {
+export default function TimePicker({ mobileEmbedded = false }: { mobileEmbedded?: boolean } = {}) {
   const selectedTime = useAppStore((s) => s.selectedTime);
-  const rain = useAppStore((s) => s.rain);
   const setTime = useAppStore((s) => s.setTime);
-  const setRain = useAppStore((s) => s.setRain);
   const isClient = useIsClient();
 
   if (!isClient) {
     // Same size placeholder so the layout does not jump
-    return <div className={`${GLASS} h-[178px]`} aria-hidden />;
+    return <div className={`${mobileEmbedded ? '' : `${GLASS} `}h-[178px]`} aria-hidden />;
   }
 
   const sliderValue = selectedTime.hour * 4 + Math.floor(selectedTime.minute / 15);
@@ -42,7 +40,7 @@ export default function TimePicker() {
   };
 
   return (
-    <div className={`${GLASS} space-y-3 p-3`}>
+    <div className={mobileEmbedded ? 'space-y-4' : `${GLASS} space-y-3 p-3`}>
       {/* Day chips */}
       <div className="flex gap-1">
         {DAYS.map((label, i) => {
@@ -53,8 +51,8 @@ export default function TimePicker() {
               type="button"
               aria-pressed={on}
               onClick={() => setTime({ ...selectedTime, day: i })}
-              className={`flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors ${
-                on ? 'bg-[#ffb547] text-[#0b1220]' : 'bg-white/5 text-slate-300 hover:bg-white/10'
+              className={`min-h-11 flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors md:min-h-10 ${
+                on ? 'bg-[#7cc4ff] text-[#0b1220]' : 'bg-white/5 text-slate-300 hover:bg-white/10'
               }`}
             >
               {label}
@@ -66,7 +64,7 @@ export default function TimePicker() {
       {/* Time slider */}
       <div>
         <div className="mb-1 flex items-baseline justify-between">
-          <span className="text-xs uppercase tracking-wide text-slate-400">Leaving at</span>
+          <span className="raasta-section-label">Leaving at</span>
           <span className="text-lg font-semibold tabular-nums text-slate-100">
             {formatTime(selectedTime.hour, selectedTime.minute)}
           </span>
@@ -82,7 +80,7 @@ export default function TimePicker() {
             setTime({ ...selectedTime, hour: Math.floor(v / 4), minute: (v % 4) * 15 });
           }}
           aria-label="Time of day"
-          className="w-full accent-[#ffb547]"
+          className="h-11 w-full accent-[#7cc4ff] md:h-10"
         />
         <div className="flex justify-between text-[10px] text-slate-500">
           <span>12 AM</span>
@@ -93,30 +91,13 @@ export default function TimePicker() {
         </div>
       </div>
 
-      {/* Now + rain */}
-      <div className="flex gap-2">
+      <div className="flex">
         <button
           type="button"
           onClick={setNow}
-          className="flex-1 rounded-lg border border-white/10 bg-white/5 py-1.5 text-sm text-slate-200 hover:bg-white/10"
+          className="raasta-button-secondary min-h-10 flex-1 py-2 text-sm"
         >
           Now
-        </button>
-        <button
-          type="button"
-          aria-pressed={rain}
-          onClick={() => setRain(!rain)}
-          className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg border py-1.5 text-sm transition-colors ${
-            rain
-              ? 'border-[#7cc4ff]/60 bg-[#7cc4ff]/20 text-[#7cc4ff]'
-              : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
-          }`}
-        >
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M7 15a4 4 0 0 1-.6-7.95A5.5 5.5 0 0 1 17 8a3.5 3.5 0 0 1 0 7H7Z" />
-            <path d="M8 19l-1 2M12 19l-1 2M16 19l-1 2" />
-          </svg>
-          Rain {rain ? 'on' : 'off'}
         </button>
       </div>
     </div>

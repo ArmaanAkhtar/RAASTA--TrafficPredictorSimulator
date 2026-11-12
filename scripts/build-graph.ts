@@ -1,6 +1,6 @@
 /**
  * scripts/build-graph.ts
- * Run: npx tsx scripts/build-graph.ts      (after scripts/build-roads.ts)
+ * Run: npx tsx scripts/build-graph.ts      (after scripts/build-roads.ts and build-streets.ts)
  *
  * Builds the DIRECTED routing graph from the raw OpenStreetMap export:
  *   Input:  scripts/data/karachi_raw.geojson   (overpass-turbo GeoJSON, lon/lat, with OSM tags)
@@ -19,6 +19,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
+import { projectLatLon } from './bbox';
 
 type Pt = [number, number];
 type Cls = 0 | 1 | 2 | 3; // 0 highway, 1 arterial, 2 local, 3 street / gali (slow, local rush profile)
@@ -36,11 +37,7 @@ const OLD_JSON = path.join(ROOT, 'public', 'data', 'road_graph.json');
 /** Vertex key: lon/lat to 6 decimals (~10 cm). Shared OSM vertices give the same key in both files. */
 const vkey = (lon: number, lat: number) => `${Math.round(lon * 1e6)},${Math.round(lat * 1e6)}`;
 
-const LAT0 = 24.8607;
-const LON0 = 67.0011;
-const M_PER_DEG_LON = 111320 * Math.cos((LAT0 * Math.PI) / 180);
-const M_PER_DEG_LAT = 110540;
-const project = (lon: number, lat: number): Pt => [(lon - LON0) * M_PER_DEG_LON, (lat - LAT0) * M_PER_DEG_LAT];
+const project = (lon: number, lat: number): Pt => projectLatLon(lat, lon);
 
 /** Routable classes -> rush profile class. Anything else is ignored. */
 const CLASS: Record<string, Cls> = {
@@ -272,7 +269,7 @@ function main(): void {
         const a = nodeOf(w.keys[startI], w.coords[startI]);
         const b = nodeOf(w.keys[i], w.coords[i]);
         if (a !== b) {
-          const inner = simplify(piece, 2.5).slice(1, -1);
+          const inner = simplify(piece, 5).slice(1, -1);
           const gStart = geom.length / 2;
           for (const p of inner) geom.push(Math.round(p[0] * 10), Math.round(p[1] * 10));
           // class in bits 0-2, bit 3 = slip road

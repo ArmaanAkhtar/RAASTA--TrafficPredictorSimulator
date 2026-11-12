@@ -84,25 +84,24 @@ function main(): void {
   console.log('-'.repeat(26 + hours.length * 13));
   for (const r of picked) {
     const row = hours.map((h) => {
-      const p = predict(r, { day: 3, hour: h, minute: 0 }, false);
+      const p = predict(r, { day: 3, hour: h, minute: 0 });
       return pad(cell(p.nowScore, p.nowLevel, p.jamChanceNextHour), 13);
     });
     console.log(pad(r.name.slice(0, 25), 26) + row.join(''));
   }
 
-  // 3. Special days + rain
-  const specials: Array<{ label: string; day: number; hour: number; rain: boolean }> = [
-    { label: 'Fri 13:00 (Jummah)', day: 5, hour: 13, rain: false },
-    { label: 'Fri 15:00 (surge)', day: 5, hour: 15, rain: false },
-    { label: 'Sun 18:00', day: 0, hour: 18, rain: false },
-    { label: 'Wed 18:00 + rain', day: 3, hour: 18, rain: true },
+  // 3. Special days
+  const specials: Array<{ label: string; day: number; hour: number }> = [
+    { label: 'Fri 13:00 (Jummah)', day: 5, hour: 13 },
+    { label: 'Fri 15:00 (surge)', day: 5, hour: 15 },
+    { label: 'Sun 18:00', day: 0, hour: 18 },
   ];
   console.log('\nSpecial cases\n');
   console.log(pad('Road', 26) + specials.map((s) => pad(s.label, 20)).join(''));
   console.log('-'.repeat(26 + specials.length * 20));
   for (const r of picked) {
     const row = specials.map((s) => {
-      const p = predict(r, { day: s.day, hour: s.hour, minute: 0 }, s.rain);
+      const p = predict(r, { day: s.day, hour: s.hour, minute: 0 });
       return pad(cell(p.nowScore, p.nowLevel, p.jamChanceNextHour), 20);
     });
     console.log(pad(r.name.slice(0, 25), 26) + row.join(''));
@@ -112,20 +111,20 @@ function main(): void {
   console.log('\nSanity checks');
   const faisal = roads.find((r) => r.name === 'Shahrah-e-Faisal');
   if (faisal) {
-    const peak = predict(faisal, { day: 3, hour: 17, minute: 0 }, false);
-    const night = predict(faisal, { day: 3, hour: 3, minute: 0 }, false);
+    const peak = predict(faisal, { day: 3, hour: 17, minute: 0 });
+    const night = predict(faisal, { day: 3, hour: 3, minute: 0 });
     console.log(`  ${peak.nowLevel === 'heavy' ? 'PASS' : 'FAIL'}  Shahrah-e-Faisal Wed 17:00 is heavy (${peak.nowScore})`);
     console.log(`  ${night.nowLevel === 'light' ? 'PASS' : 'FAIL'}  Shahrah-e-Faisal Wed 03:00 is light (${night.nowScore})`);
-    const p = predict(faisal, { day: 3, hour: 16, minute: 30 }, false);
+    const p = predict(faisal, { day: 3, hour: 16, minute: 30 });
     console.log(`  ${p.hourly.length === 24 ? 'PASS' : 'FAIL'}  hourly has 24 entries`);
-    console.log(`  info  Demo moment: ${DAYS[3]} 16:00 -> score ${predict(faisal, { day: 3, hour: 16, minute: 0 }, false).nowScore}, jam next hour ${predict(faisal, { day: 3, hour: 16, minute: 0 }, false).jamChanceNextHour}%`);
+    console.log(`  info  Demo moment: ${DAYS[3]} 16:00 -> score ${predict(faisal, { day: 3, hour: 16, minute: 0 }).nowScore}, jam next hour ${predict(faisal, { day: 3, hour: 16, minute: 0 }).jamChanceNextHour}%`);
   } else {
     console.log('  FAIL  Shahrah-e-Faisal not found in roads.geojson');
   }
 
   // 5. Speed
   const t0 = Date.now();
-  for (const r of roads) predict(r, { day: 3, hour: 17, minute: 0 }, false);
+  for (const r of roads) predict(r, { day: 3, hour: 17, minute: 0 });
   console.log(`  info  predict() for all ${roads.length} roads took ${Date.now() - t0} ms\n`);
 }
 

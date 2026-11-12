@@ -12,7 +12,7 @@ const DEMO_TIME: SelectedTime = { day: 3, hour: 16, minute: 0 }; // Wednesday 4:
 const ROUTE_DELAY_MS = 1500;
 const CHIP_MS = 5000;
 
-export default function DemoButton() {
+export default function DemoButton({ iconOnly = false }: { iconOnly?: boolean } = {}) {
   const [running, setRunning] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const timers = useRef<number[]>([]);
@@ -37,8 +37,7 @@ export default function DemoButton() {
     setNote(null);
     setRunning(true);
 
-    // 1. Wednesday 4 PM, no rain  2. select Shahrah-e-Faisal (camera flies there)
-    state.setRain(false);
+    // 1. Wednesday 4 PM  2. select Shahrah-e-Faisal (camera flies there)
     state.setTime(DEMO_TIME);
     state.selectRoad(road.id);
 
@@ -46,7 +45,7 @@ export default function DemoButton() {
     timers.current.push(
       window.setTimeout(() => {
         const s = useAppStore.getState();
-        const route = findAltRoute(s.roads, road.id, DEMO_TIME, false);
+        const route = findAltRoute(s.roads, road.id, DEMO_TIME);
         s.setAltRoute(route);
         s.setShowRoute(route !== null);
       }, ROUTE_DELAY_MS),
@@ -55,25 +54,29 @@ export default function DemoButton() {
   };
 
   return (
-    <div className="flex items-center gap-2">
+    <div className={iconOnly ? 'flex flex-col items-center gap-2' : 'flex items-center gap-2'}>
       <button
         type="button"
         onClick={run}
         disabled={running}
-        className="flex items-center gap-1.5 rounded-full bg-[#ffb547] px-4 py-2 text-sm font-semibold text-[#0b1220] shadow-lg transition-opacity hover:opacity-90 disabled:opacity-60"
+        aria-label={iconOnly ? (running ? 'Demo running' : 'Play demo') : undefined}
+        title={iconOnly ? 'Play demo' : undefined}
+        className={iconOnly
+          ? 'raasta-mobile-fab grid h-11 w-11 place-items-center rounded-full disabled:opacity-60'
+          : 'raasta-button-primary flex min-h-10 items-center gap-1.5 px-4 py-2 text-sm disabled:opacity-60'}
       >
-        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
+        <svg viewBox="0 0 24 24" className={iconOnly ? 'h-5 w-5' : 'h-4 w-4'} fill="none" stroke="currentColor" strokeWidth={iconOnly ? '1.75' : '1.5'} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M8 5v14l11-7z" />
         </svg>
-        Play demo
+        {!iconOnly && 'Play demo'}
       </button>
       {running && (
-        <span className="flex items-center gap-1.5 rounded-full border border-white/10 bg-[#0b1220]/80 px-3 py-1 text-xs text-slate-200 backdrop-blur-md">
-          <span className="h-2 w-2 animate-pulse rounded-full bg-[#ffb547]" />
+        <span className={`${iconOnly ? 'sr-only' : 'raasta-panel flex items-center gap-1.5 px-3 py-1 text-xs text-slate-200'}`} role={iconOnly ? 'status' : undefined}>
+          <span className="h-2 w-2 animate-pulse rounded-full bg-[#7cc4ff]" />
           Demo running
         </span>
       )}
-      {note && <span className="text-xs text-slate-400">{note}</span>}
+      {note && <span className={iconOnly ? 'sr-only' : 'text-xs text-slate-400'} role={iconOnly ? 'status' : undefined}>{note}</span>}
     </div>
   );
 }

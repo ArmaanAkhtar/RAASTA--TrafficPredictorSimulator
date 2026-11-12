@@ -23,7 +23,7 @@ const NIGHT_SKY = '#04070e';
 const DAY_SKY = '#7fa9cf'; // hazy Karachi afternoon blue
 const NIGHT_HORIZON = '#0c1424';
 const DAY_HORIZON = '#d4dde6';
-const GOLDEN_HORIZON = '#ffa95e';
+const DAWN_HORIZON = '#d9d4ca';
 const NIGHT_GROUND = '#050912';
 const DAY_GROUND = '#3a4252'; // dusty grey-blue land, so roads and colours read in daylight
 const NIGHT_FOG = '#04070e';
@@ -48,7 +48,7 @@ export function useDaylight(): DaylightState {
     groundColor: new THREE.Color('#070b16'),
     fogColor: new THREE.Color('#05080f'),
     sunDirection: sunDirectionFor(16),
-    sunColor: new THREE.Color('#fff2d2'),
+    sunColor: new THREE.Color('#f6f2ea'),
     sunIntensity: 2.2,
     ambientIntensity: 0.72,
     darkness: 0,
@@ -78,16 +78,16 @@ export function useDaylight(): DaylightState {
     const sky = new THREE.Color(NIGHT_SKY).lerp(new THREE.Color(DAY_SKY), day);
     const ground = new THREE.Color(NIGHT_GROUND).lerp(new THREE.Color(DAY_GROUND), day);
     const fog = new THREE.Color(NIGHT_FOG).lerp(new THREE.Color(DAY_FOG), day);
-    // Horizon: day haze / night navy, warmed to amber at dawn and sunset
+    // Horizon: neutral daylight haze against a deep navy night.
     const horizon = new THREE.Color(NIGHT_HORIZON)
       .lerp(new THREE.Color(DAY_HORIZON), day)
-      .lerp(new THREE.Color(GOLDEN_HORIZON), Math.min(1, horizonGlow * 1.4));
+      .lerp(new THREE.Color(DAWN_HORIZON), Math.min(1, horizonGlow * 1.4));
     // Fog uses the horizon colour so the far ground melts into the sky (no hard edge)
     fog.lerp(horizon, 0.6);
     const sun = darkness > 0.6
       ? new THREE.Color('#8790a8')
       : targetHour >= 17 && targetHour <= 18.5
-        ? new THREE.Color('#ffb36b')
+        ? new THREE.Color('#f6f2ea')
         : new THREE.Color('#bcd3e6');
     const sunIntensity = darkness >= 0.95 ? 0 : THREE.MathUtils.lerp(0.25, 1.7, day);
     target.current = {

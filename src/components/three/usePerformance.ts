@@ -18,14 +18,10 @@ export function useSettledValue<T>(value: T, ms: number): T {
   return settled;
 }
 
-/** Selected time + rain, settled. Used so the 3D only rebuilds once the slider stops. */
-export function useSettledTimeAndRain(ms: number) {
+/** Selected time, settled. Used so the 3D only rebuilds once the slider stops. */
+export function useSettledTime(ms: number) {
   const selectedTime = useAppStore((state) => state.selectedTime);
-  const rain = useAppStore((state) => state.rain);
-  return {
-    time: useSettledValue(selectedTime, ms),
-    rain: useSettledValue(rain, ms),
-  };
+  return useSettledValue(selectedTime, ms);
 }
 
 /** True on phones/tablets or machines with few CPU cores. Client-only (the Scene is never server-rendered). */

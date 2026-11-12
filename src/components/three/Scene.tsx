@@ -15,7 +15,7 @@ import { isWeakDevice } from './usePerformance';
 import { useDaylight } from './useDaylight';
 import * as THREE from 'three';
 
-function GradientSky({ skyColor, horizonColor, horizonGlow }: { skyColor: THREE.Color; horizonColor: THREE.Color; horizonGlow: number }) {
+function GradientSky({ skyColor, horizonColor, horizonGlow, scale }: { skyColor: THREE.Color; horizonColor: THREE.Color; horizonGlow: number; scale: number }) {
   const materialRef = useRef<THREE.ShaderMaterial>(null);
   useFrame(() => {
     const material = materialRef.current;
@@ -25,7 +25,7 @@ function GradientSky({ skyColor, horizonColor, horizonGlow }: { skyColor: THREE.
     material.uniforms.glow.value = THREE.MathUtils.damp(material.uniforms.glow.value, horizonGlow, 5, 1 / 60);
   });
   return (
-    <mesh scale={90000} renderOrder={-100}>
+    <mesh scale={scale} renderOrder={-100}>
       <sphereGeometry args={[1, 32, 16]} />
       <shaderMaterial
         ref={materialRef}
@@ -48,7 +48,7 @@ function GradientSky({ skyColor, horizonColor, horizonGlow }: { skyColor: THREE.
           varying vec3 vWorldPosition;
           void main() {
             float heightMix = smoothstep(-0.15, 0.7, normalize(vWorldPosition).y);
-            // horizon colour near the ground, sky colour overhead (no dark band, no orange walls)
+            // horizon colour near the ground, sky colour overhead (no dark band or hard colour boundary)
             vec3 gradient = mix(bottomColor, topColor, heightMix);
             float edge = 1.0 - smoothstep(-0.03, 0.12, normalize(vWorldPosition).y);
             gradient = mix(gradient, bottomColor, edge * (0.6 + glow));
@@ -65,6 +65,10 @@ interface GroundBounds {
   width: number;
   depth: number;
   margin: number;
+  maxDistance: number;
+  fogNear: number;
+  fogFar: number;
+  skyScale: number;
 }
 
 function DaylightRig({ ground }: { ground: GroundBounds }) {
@@ -92,7 +96,12 @@ function DaylightRig({ ground }: { ground: GroundBounds }) {
 
   return (
     <>
-      <GradientSky skyColor={daylight.skyColor} horizonColor={daylight.horizonColor} horizonGlow={daylight.horizonGlow} />
+      <GradientSky
+        skyColor={daylight.skyColor}
+        horizonColor={daylight.horizonColor}
+        horizonGlow={daylight.horizonGlow}
+        scale={ground.skyScale}
+      />
       <hemisphereLight ref={hemisphere} args={[daylight.skyColor, daylight.groundColor, daylight.ambientIntensity]} />
       <directionalLight
         ref={sun}
@@ -111,7 +120,7 @@ function DaylightRig({ ground }: { ground: GroundBounds }) {
         shadow-bias={-0.00015}
       />
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[ground.centerX, -1, ground.centerZ]} receiveShadow={false}>
-        <planeGeometry args={[ground.width + 300000, ground.depth + 300000]} />
+        <planeGeometry args={[ground.width, ground.depth]} />
         <meshStandardMaterial ref={groundMaterial} color={daylight.groundColor} roughness={1} metalness={0.05} />
       </mesh>
       <Grid
@@ -147,7 +156,9 @@ export function Scene() {
   const weak = useMemo(() => isWeakDevice(), []);
 
   const ground = useMemo(() => {
-    if (roads.length === 0) return { centerX: 0, centerZ: 0, width: 50000, depth: 50000, margin: 5000 };
+    if (roads.length === 0) {
+      return { centerX: 0, centerZ: 0, width: 10000, depth: 10000, margin: 5000, maxDistance: 42000, fogNear: 35000, fogFar: 85000, skyScale: 90000 };
+    }
     let minX = Infinity;
     let maxX = -Infinity;
     let minY = Infinity;
@@ -167,25 +178,38 @@ export function Scene() {
     const rawMaxX = maxX + margin;
     const rawMinY = minY - margin;
     const rawMaxY = maxY + margin;
+    const width = rawMaxX - rawMinX;
+    const depth = rawMaxY - rawMinY;
+    const extent = Math.max(width, depth);
+    const maxDistance = Math.max(42000, extent * 2.5);
     return {
       centerX: (rawMinX + rawMaxX) * 0.5,
       centerZ: -(rawMinY + rawMaxY) * 0.5,
-      width: rawMaxX - rawMinX,
-      depth: rawMaxY - rawMinY,
+      width,
+      depth,
       margin,
+      maxDistance,
+      fogNear: Math.max(35000, extent * 0.75),
+      fogFar: Math.max(85000, extent * 3),
+      skyScale: Math.max(90000, maxDistance * 2),
     };
   }, [roads]);
 
   return (
     <Canvas
       dpr={weak ? 1 : [1, 1.5]}
-      camera={{ position: [0, 6000, 7000], fov: 45, near: 10, far: 100000 }}
+      camera={{
+        position: [ground.centerX, Math.max(6000, Math.max(ground.width, ground.depth) * 0.3), ground.centerZ + Math.max(7000, Math.max(ground.width, ground.depth) * 0.35)],
+        fov: 45,
+        near: 10,
+        far: Math.max(100000, ground.maxDistance * 2.5),
+      }}
       gl={{ antialias: !weak, logarithmicDepthBuffer: true, powerPreference: 'high-performance' }}
       shadows={false}
       frameloop={tabVisible ? 'always' : 'never'}
       style={{ background: '#05080f' }}
     >
-      <fog attach="fog" args={['#05080f', 35000, 85000]} />
+      <fog attach="fog" args={['#05080f', ground.fogNear, ground.fogFar]} />
       <DaylightRig ground={ground} />
 
       <Streets />
@@ -198,9 +222,9 @@ export function Scene() {
 
       <MapControls
         makeDefault
-        target={[0, 0, 0]}
+        target={[ground.centerX, 0, ground.centerZ]}
         minDistance={1200}
-        maxDistance={42000}
+        maxDistance={ground.maxDistance}
         minPolarAngle={0.15}
         maxPolarAngle={Math.PI / 2 - 0.05}
         enableDamping

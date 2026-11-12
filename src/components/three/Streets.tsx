@@ -13,10 +13,14 @@ const STREET_Y = 0.8; // above the ground and grid, below every road ribbon (loc
 const HALF_WIDTH_M = 3.5;
 const MIN_PIXELS = 1.1; // never thinner than this on screen
 const WHITE = new THREE.Color('#ffffff');
+const FILE_MAGIC = 0x53545232;
 
 /** streets.bin -> per-segment [x0, y0, x1, y1] (local metres) */
 function decode(buffer: ArrayBuffer): Float32Array {
-  const data = new Int16Array(buffer);
+  const isExpandedFormat = buffer.byteLength >= 4 && new DataView(buffer).getInt32(0, true) === FILE_MAGIC;
+  const data: ArrayLike<number> = isExpandedFormat
+    ? new Int32Array(buffer, 4)
+    : new Int16Array(buffer);
   let segments = 0;
   for (let i = 0; i < data.length; ) {
     const n = data[i];

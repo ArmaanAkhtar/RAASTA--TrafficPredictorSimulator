@@ -3,17 +3,19 @@
 // Coordinates are approximate area centres; the router snaps them to the nearest major road,
 // so being a few hundred metres off does not matter.
 import type { Pt, Road } from './types';
-
-const LAT0 = 24.8607;
-const LON0 = 67.0011;
-const M_PER_DEG_LON = 111320 * Math.cos((LAT0 * Math.PI) / 180);
-const M_PER_DEG_LAT = 110540;
+import { projectLatLon } from './projection';
 
 export interface Place {
   id: string;
   name: string;
-  kind: 'area' | 'block' | 'landmark' | 'road' | 'location';
+  kind: 'area' | 'block' | 'landmark' | 'street' | 'road' | 'location';
   point: Pt; // local metres, same system as roads
+  nameEn?: string;
+  nameUr?: string;
+  aliases?: string[];
+  category?: string;
+  bbox?: [number, number, number, number]; // minX, minY, maxX, maxY, in local metres
+  parentArea?: string;
   /** landmark type from OpenStreetMap: 'edu', 'hospital', 'park', 'shop', 'sport', 'station', 'airport', 'worship', 'sight' */
   cat?: string;
 }
@@ -22,25 +24,14 @@ export const PLACE_KIND_LABEL: Record<Place['kind'], string> = {
   area: 'Area',
   block: 'Block',
   landmark: 'Place',
+  street: 'Street',
   road: 'Road',
   location: 'GPS',
 };
 
-export const CAT_ICON: Record<string, string> = {
-  edu: '🎓',
-  hospital: '🏥',
-  park: '🌳',
-  shop: '🛍️',
-  sport: '🏟️',
-  station: '🚉',
-  airport: '✈️',
-  worship: '🕌',
-  sight: '📍',
-};
-
 /** [lat, lon] -> local metres [x, y] (same formula as scripts/build-roads.ts). */
 export function toLocal(lat: number, lon: number): Pt {
-  return [(lon - LON0) * M_PER_DEG_LON, (lat - LAT0) * M_PER_DEG_LAT];
+  return projectLatLon(lat, lon);
 }
 
 const RAW: Array<[string, 'area' | 'landmark', number, number]> = [
@@ -66,6 +57,12 @@ const RAW: Array<[string, 'area' | 'landmark', number, number]> = [
   ['Orangi Town', 'area', 24.9500, 66.9900],
   ['Gulberg', 'area', 24.9330, 67.0600],
   ['Surjani Town', 'area', 25.0200, 67.0500],
+  ['DHA Phase 8', 'area', 24.7900, 67.0850],
+  ['Quaidabad', 'area', 24.8510, 67.1850],
+  ['Gulshan-e-Maymar', 'area', 25.0350, 67.1400],
+  ['Bahria Town Karachi', 'area', 25.0200, 67.2900],
+  ['Port Qasim', 'area', 24.7850, 67.3400],
+  ['Hawksbay', 'area', 24.8350, 66.8300],
   // Landmarks
   ['Jinnah International Airport', 'landmark', 24.9065, 67.1608],
   ['University of Karachi', 'landmark', 24.9420, 67.1140],

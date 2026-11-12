@@ -16,18 +16,13 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
+import { projectLatLon } from './bbox';
 
 type Pt = [number, number];
 
 const ROOT = process.cwd();
 const ROADS_FILE = path.join(ROOT, 'public', 'data', 'roads.geojson');
 const OUT_FILE = path.join(ROOT, 'public', 'data', 'cameras.json');
-
-const LAT0 = 24.8607;
-const LON0 = 67.0011;
-const M_PER_DEG_LON = 111320 * Math.cos((LAT0 * Math.PI) / 180);
-const M_PER_DEG_LAT = 110540;
-const toLocal = (lat: number, lon: number): Pt => [(lon - LON0) * M_PER_DEG_LON, (lat - LAT0) * M_PER_DEG_LAT];
 
 const ECHALLAN = 'Reported e-challan camera zone (2025)';
 const SAFE_CITY = 'Karachi Safe City Phase I coverage';
@@ -116,7 +111,7 @@ function main(): void {
 
     // Named spots, snapped to the nearest point of the road
     for (const [spot, lat, lon] of plan.spots.slice(0, plan.count)) {
-      const target = toLocal(lat, lon);
+      const target = projectLatLon(lat, lon);
       let best = road.points[0];
       for (const p of road.points) if (dist(p, target) < dist(best, target)) best = p;
       placed.push({ spot, p: best });
@@ -156,7 +151,7 @@ function main(): void {
   }
 
   fs.writeFileSync(OUT_FILE, JSON.stringify(out, null, 2) + '\n', 'utf8');
-  console.log(`\nWrote ${out.length} cameras to public/data/cameras.json\n`);
+  console.log(`\nWrote ${out.length} cameras (${(fs.statSync(OUT_FILE).size / 1024).toFixed(0)} KB) to public/data/cameras.json\n`);
 }
 
 main();

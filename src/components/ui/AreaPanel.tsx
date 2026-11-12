@@ -3,23 +3,30 @@
 // Sindh Safe City grants access) and quick directions. Desktop: right panel. Mobile: bottom sheet.
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useAreaPanelVisible, useAreaStore } from '../../lib/area';
 import { camerasNear } from '../../lib/cameras';
 import { useLocationStore } from '../../lib/location';
 import { MY_LOCATION_ID, useTripStore } from '../../lib/trip';
 import { useAppStore } from '../../store/useAppStore';
 import { CameraList, useCameras } from './CameraList';
-import { CAT_ICON, PLACE_KIND_LABEL } from '../../lib/places';
+import { PLACE_KIND_LABEL } from '../../lib/places';
+import { useMobileSheet } from './useMobileSheet';
 
 const RADIUS_M = 2500;
 
-export default function AreaPanel() {
+export default function AreaPanel({
+  mobileEmbedded = false,
+  onDirections,
+}: {
+  mobileEmbedded?: boolean;
+  onDirections?: () => void;
+} = {}) {
   const place = useAreaStore((s) => s.place);
   const setPlace = useAreaStore((s) => s.setPlace);
   const visible = useAreaPanelVisible();
   const allCameras = useCameras();
-  const [collapsed, setCollapsed] = useState(false);
+  const { snapPoint, snapHeightClass, handleProps } = useMobileSheet();
 
   // Picking a road hands the right side over to the road panel
   useEffect(
@@ -46,45 +53,49 @@ export default function AreaPanel() {
       loc.locate(false); // the planner fills "My location" in once it is known, or the user types a From
     }
     setPlace(null); // show the trip panel instead
+    onDirections?.();
   };
 
   return (
     <aside
-      className={`fixed inset-x-0 bottom-0 z-30 flex flex-col overflow-hidden rounded-t-2xl border border-white/10 bg-[#0b1220]/85 text-slate-100 shadow-2xl backdrop-blur-md transition-[max-height] duration-300 md:inset-x-auto md:bottom-4 md:right-4 md:top-4 md:max-h-none md:w-[360px] md:rounded-2xl ${
-        collapsed ? 'max-h-[76px]' : 'max-h-[75vh]'
-      }`}
+      data-mobile-sheet={!mobileEmbedded || undefined}
+      data-sheet-snap={mobileEmbedded ? undefined : snapPoint}
+      onWheelCapture={(event) => event.stopPropagation()}
+      className={mobileEmbedded
+        ? 'flex min-h-0 flex-1 flex-col overflow-hidden text-slate-100'
+        : `raasta-panel fixed inset-x-0 bottom-0 z-30 flex ${snapHeightClass} flex-col overflow-hidden pb-[env(safe-area-inset-bottom)] text-slate-100 transition-[height] duration-300 md:inset-x-auto md:bottom-4 md:right-4 md:top-4 md:h-auto md:max-h-[calc(100dvh-2rem)] md:w-[360px] md:pb-0`}
       aria-label={`Cameras around ${place.name}`}
     >
-      <button
+      {!mobileEmbedded && <button
         type="button"
-        onClick={() => setCollapsed((c) => !c)}
-        className="flex w-full justify-center pt-2 md:hidden"
-        aria-label={collapsed ? 'Expand panel' : 'Collapse panel'}
+        {...handleProps}
+        className="flex min-h-10 w-full shrink-0 touch-none items-center justify-center md:hidden"
+        aria-label={`Resize panel, currently ${snapPoint}`}
       >
         <span className="h-1 w-10 rounded-full bg-white/25" />
-      </button>
+      </button>}
 
-      <div className="flex items-start gap-3 px-4 pb-3 pt-2 md:pt-4">
+      <div className={`flex shrink-0 items-start gap-3 px-4 pb-3 ${mobileEmbedded ? 'pt-0' : 'pt-2 md:pt-4'}`}>
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-[#ffb547]">
-            {place.cat ? `${CAT_ICON[place.cat] ?? ''} ` : ''}{PLACE_KIND_LABEL[place.kind]}
+          <p className="raasta-section-label">
+            {PLACE_KIND_LABEL[place.kind]}
           </p>
-          <h2 className="truncate text-lg font-semibold">{place.name}</h2>
+          <h2 className={`truncate ${mobileEmbedded ? 'text-[17px]' : 'text-lg'} font-semibold`}>{place.name}</h2>
           <p className="text-xs text-slate-400">Traffic cameras within {RADIUS_M / 1000} km</p>
         </div>
         <button
           type="button"
           onClick={() => setPlace(null)}
           aria-label="Close"
-          className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-slate-100"
+          className={`grid ${mobileEmbedded ? 'h-11 w-11 rounded-[14px]' : 'h-10 w-10 rounded-lg'} shrink-0 place-items-center text-slate-400 hover:bg-white/10 hover:text-slate-100`}
         >
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.5">
             <path d="M6 6l12 12M18 6 6 18" />
           </svg>
         </button>
       </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto px-4 pb-4">
+      <div className="raasta-scroll min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 pb-4">
         <CameraList
           title={`Cameras near ${place.name}`}
           cameras={near}
@@ -97,7 +108,7 @@ export default function AreaPanel() {
         <button
           type="button"
           onClick={directions}
-          className="w-full rounded-xl bg-[#7cc4ff] py-2 text-sm font-semibold text-[#0b1220] hover:opacity-90"
+          className="raasta-button-primary min-h-10 w-full py-2 text-sm"
         >
           Directions to {place.name}
         </button>

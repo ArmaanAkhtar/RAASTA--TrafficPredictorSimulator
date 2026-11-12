@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import { hasLiveFeed, loadCameras, type CameraInfo } from '../../lib/cameras';
 import { useAppStore } from '../../store/useAppStore';
+import { CameraIcon } from './CameraIcon';
 
 /** All cameras, loaded once. */
 export function useCameras(): CameraInfo[] {
@@ -38,18 +39,16 @@ export function CameraList({
   emptyText: string;
 }) {
   const openCamera = useAppStore((s) => s.openCamera);
+  const activeCameraId = useAppStore((s) => s.activeCameraId);
   const [expanded, setExpanded] = useState(false);
   const shown = expanded ? cameras : cameras.slice(0, 4);
 
   return (
-    <div className="rounded-xl bg-white/5 p-3">
+    <div className="raasta-card p-3">
       <div className="mb-2 flex items-center gap-2">
-        <svg viewBox="0 0 24 24" className="h-4 w-4 text-[#ffb547]" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-          <path d="M3 7h11a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H3z" />
-          <path d="m16 11 5-3v8l-5-3" />
-        </svg>
-        <p className="flex-1 text-xs font-semibold text-slate-200">{title}</p>
-        <span className="rounded-full bg-[#ffb547]/15 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[#ffb547]">
+        <CameraIcon className="h-4 w-4 text-[#7cc4ff]" />
+        <p className="raasta-section-label flex-1">{title}</p>
+        <span className="rounded-md bg-[#7cc4ff]/10 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[#7cc4ff]">
           {cameras.length}
         </span>
       </div>
@@ -57,20 +56,37 @@ export function CameraList({
       {cameras.length === 0 ? (
         <p className="text-xs text-slate-500">{emptyText}</p>
       ) : (
-        <ul className="space-y-1">
+        <ul className="raasta-scroll max-h-[35dvh] space-y-1 overflow-y-auto overscroll-contain">
           {shown.map((c) => (
             <li key={c.id}>
               <button
                 type="button"
                 onClick={() => openCamera(c.id)}
-                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ffb547]"
+                aria-pressed={activeCameraId === c.id}
+                className={`flex min-h-11 w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7cc4ff] md:min-h-10 ${
+                  activeCameraId === c.id ? 'bg-[#7cc4ff]/10' : ''
+                }`}
               >
-                <span className={`h-2 w-2 shrink-0 rounded-full ${hasLiveFeed(c) ? 'bg-[#30a46c]' : 'bg-slate-500'}`} aria-hidden />
+                <span
+                  className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border transition-colors ${
+                    activeCameraId === c.id
+                      ? 'border-[#7cc4ff] bg-[#7cc4ff] text-[#0b1220]'
+                      : 'border-[#7cc4ff]/70 bg-[#0f1729] text-[#f6f2ea]'
+                  }`}
+                  aria-hidden
+                >
+                  <CameraIcon className="h-4 w-4" />
+                </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-xs text-slate-100">{c.name}</span>
                   <span className="block truncate text-[11px] text-slate-500">{detail ? detail(c) : c.roadName}</span>
                 </span>
-                <span className="shrink-0 text-[11px] text-slate-400">{hasLiveFeed(c) ? 'Live' : 'View'} ›</span>
+                <span className="flex shrink-0 items-center gap-1 text-[11px] text-slate-400">
+                  {hasLiveFeed(c) ? 'Live' : 'View'}
+                  <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+                    <path d="m9 18 6-6-6-6" />
+                  </svg>
+                </span>
               </button>
             </li>
           ))}
@@ -78,7 +94,7 @@ export function CameraList({
       )}
 
       {cameras.length > 4 && (
-        <button type="button" onClick={() => setExpanded((v) => !v)} className="mt-1 text-[11px] font-medium text-[#9cc9ff] hover:text-white">
+        <button type="button" onClick={() => setExpanded((v) => !v)} className="mt-1 min-h-11 text-[11px] font-medium text-[#7cc4ff] hover:text-[#f6f2ea] md:min-h-10">
           {expanded ? 'Show less' : `Show all ${cameras.length}`}
         </button>
       )}

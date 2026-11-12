@@ -5,6 +5,7 @@
 
 import { create } from 'zustand';
 import { toLocal } from './places';
+import { useAppStore } from '@/store/useAppStore';
 import type { Pt } from './types';
 
 export type LocationStatus = 'idle' | 'locating' | 'ok' | 'denied' | 'unavailable' | 'outside';
@@ -18,9 +19,22 @@ interface LocationState {
   locate: (flyThere?: boolean) => void;
 }
 
-// The road map covers x -10..24 km, y -8..24 km around the origin; allow ~5 km around it
-const KARACHI_BOX = { minX: -15000, maxX: 29000, minY: -13000, maxY: 29000 };
-const inKarachi = ([x, y]: Pt) => x >= KARACHI_BOX.minX && x <= KARACHI_BOX.maxX && y >= KARACHI_BOX.minY && y <= KARACHI_BOX.maxY;
+function inMapBounds([x, y]: Pt): boolean {
+  const roads = useAppStore.getState().roads;
+  if (roads.length === 0) return true;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  roads.forEach((road) => road.segments.forEach((segment) => segment.forEach(([roadX, roadY]) => {
+    minX = Math.min(minX, roadX);
+    maxX = Math.max(maxX, roadX);
+    minY = Math.min(minY, roadY);
+    maxY = Math.max(maxY, roadY);
+  })));
+  const margin = 5000;
+  return x >= minX - margin && x <= maxX + margin && y >= minY - margin && y <= maxY + margin;
+}
 
 export const useLocationStore = create<LocationState>((set, get) => ({
   status: 'idle',
@@ -37,7 +51,7 @@ export const useLocationStore = create<LocationState>((set, get) => ({
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const point = toLocal(pos.coords.latitude, pos.coords.longitude);
-        if (!inKarachi(point)) {
+        if (!inMapBounds(point)) {
           set({ status: 'outside', point: null, accuracyM: null });
           return;
         }

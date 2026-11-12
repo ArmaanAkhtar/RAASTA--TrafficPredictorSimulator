@@ -51,7 +51,7 @@ for (const [a, b] of trips) {
   console.log(`\n${a} -> ${b}  (Wed 5 PM)`);
   for (const mode of ['time', 'petrol'] as const) {
     const t0 = performance.now();
-    const r = findTrip(roads, place(a), place(b), time, false, mode);
+    const r = findTrip(roads, place(a), place(b), time, mode);
     const ms = performance.now() - t0;
     if (!r) { console.log(`  ${mode.padEnd(6)} no route`); continue; }
     const via = r.roadIds.slice(0, 3).map((id) => nameOf.get(id) ?? id).join(' -> ');
@@ -65,7 +65,7 @@ console.log('\n=== Best time to leave (next 2 h), Gulshan-e-Iqbal -> Clifton ===
 for (const hour of [7, 9, 16, 17, 19, 22]) {
   for (const mode of ['time', 'petrol'] as const) {
     const start = { day: 3, hour, minute: 0 };
-    const { slots, advice } = planDeparture(roads, place('Gulshan-e-Iqbal'), place('Clifton'), start, false, mode);
+    const { slots, advice } = planDeparture(roads, place('Gulshan-e-Iqbal'), place('Clifton'), start, mode);
     const row = slots.map((s) => (s.trip ? `${s.trip.minutes}${s.trafficFree ? '*' : ''}` : '-')).join(' ');
     const msg =
       advice.kind === 'wait' ? `WAIT till ${fmt(advice.slot.time)} (traffic-free, saves ${advice.savesMin} min)`

@@ -98,9 +98,9 @@ function main(): void {
       console.log(`\n${name}: not found`);
       continue;
     }
-    const p = predict(road, time, false);
+    const p = predict(road, time);
     t0 = performance.now();
-    const route = findAltRoute(roads, road.id, time, false);
+    const route = findAltRoute(roads, road.id, time);
     const ms = performance.now() - t0;
 
     console.log(`\n${name}  (now ${p.nowScore}, ${p.nowLevel}, jam next hour ${p.jamChanceNextHour}%)`);

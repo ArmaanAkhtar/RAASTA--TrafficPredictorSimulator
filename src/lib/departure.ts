@@ -44,19 +44,18 @@ export function planDeparture(
   from: Pt,
   to: Pt,
   start: SelectedTime,
-  rain: boolean,
   mode: TripMode,
   vehicle: Vehicle = 'car',
 ): { slots: DepartureSlot[]; advice: LeaveAdvice } {
   if (vehicle === 'walk') {
-    const trip = findTrip(roads, from, to, start, rain, mode, 'walk');
+    const trip = findTrip(roads, from, to, start, mode, 'walk');
     const slots = [{ offsetMin: 0, time: start, trip, trafficFree: true }];
     return { slots, advice: trip ? { kind: 'walk' } : { kind: 'none' } };
   }
   const slots: DepartureSlot[] = [];
   for (let offset = 0; offset <= LOOKAHEAD_MIN; offset += STEP_MIN) {
     const time = addMinutes(start, offset);
-    const trip = findTrip(roads, from, to, time, rain, mode, vehicle);
+    const trip = findTrip(roads, from, to, time, mode, vehicle);
     slots.push({ offsetMin: offset, time, trip, trafficFree: isTrafficFree(trip) });
   }
 
