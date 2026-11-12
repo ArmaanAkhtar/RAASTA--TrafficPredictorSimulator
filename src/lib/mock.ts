@@ -49,17 +49,16 @@ function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
-export function predict(road: Road, time: SelectedTime, rain: boolean): Prediction {
+export function predict(road: Road, time: SelectedTime): Prediction {
   const seed = hashText(`${road.id}-${time.day}`);
   const weekdayFactor = time.day === 0 || time.day === 6 ? -8 : 4;
-  const rainFactor = rain ? 12 : 0;
   const hourly = Array.from({ length: 24 }, (_, hour): Prediction['hourly'][number] => {
     const commutePeak = hour >= 7 && hour <= 10
       ? 24
       : hour >= 16 && hour <= 20
         ? 28
         : -8;
-    const score = clamp(18 + ((seed + hour * 17 + time.day * 11) % 38) + commutePeak + weekdayFactor + rainFactor, 5, 100);
+    const score = clamp(18 + ((seed + hour * 17 + time.day * 11) % 38) + commutePeak + weekdayFactor, 5, 100);
     return { hour, score, level: levelOf(score) };
   });
 
@@ -80,7 +79,6 @@ export function findAltRoute(
   _roads: Road[],
   _roadId: string,
   _time: SelectedTime,
-  _rain: boolean,
 ): RouteResult | null {
   return null;
 }

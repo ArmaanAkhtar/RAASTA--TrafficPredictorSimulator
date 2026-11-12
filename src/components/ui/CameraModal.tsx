@@ -1,178 +1,169 @@
-// src/components/ui/CameraModal.tsx
-// Opens when activeCameraId is set. Shows the camera's live view once the Sindh Government (Safe City)
-// grants access; until then an "Access not granted" box. Arrows step through the other cameras on the
-// same road. Esc closes.
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { LEVEL_COLOR, predict } from '../../lib/api';
-import { hasLiveFeed, loadCameras, type CameraInfo } from '../../lib/cameras';
-import type { RushLevel } from '../../lib/types';
-import { useAppStore } from '../../store/useAppStore';
+import { useEffect, useRef, useState } from 'react';
+import { loadCameras, type CameraInfo } from '@/lib/cameras';
+import { useAppStore } from '@/store/useAppStore';
+import { RestrictedCameraScreen } from './RestrictedCameraScreen';
 
-const LEVEL_LABEL: Record<RushLevel, string> = { light: 'Light', medium: 'Medium', heavy: 'Heavy' };
+const RESTRICTED_FEED_MESSAGE =
+  "Karachi's traffic cameras are not publicly accessible yet. Raasta is ready to plug in official live feeds the moment the city opens them, like London (TfL) and California (Caltrans) already do. Until then, Raasta's prediction shows you what this road will look like.";
 
 export default function CameraModal() {
-  const activeCameraId = useAppStore((s) => s.activeCameraId);
-  const openCamera = useAppStore((s) => s.openCamera);
-  const roads = useAppStore((s) => s.roads);
-  const selectedTime = useAppStore((s) => s.selectedTime);
-  const rain = useAppStore((s) => s.rain);
-
+  const activeCameraId = useAppStore((state) => state.activeCameraId);
+  const openCamera = useAppStore((state) => state.openCamera);
+  const selectRoad = useAppStore((state) => state.selectRoad);
   const [cameras, setCameras] = useState<CameraInfo[]>([]);
-  const [videoErrorFor, setVideoErrorFor] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [fullscreenMessage, setFullscreenMessage] = useState<string | null>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const camera = cameras.find((item) => item.id === activeCameraId) ?? null;
 
   useEffect(() => {
-    let alive = true;
+    let active = true;
     loadCameras()
-      .then((c) => {
-        if (alive) setCameras(c);
+      .then((items) => {
+        if (active) setCameras(items);
       })
-      .catch(() => {
-        // no cameras.json
+      .catch((error: unknown) => {
+        if (active) {
+          setLoadError(error instanceof Error ? error.message : 'Camera information could not be loaded.');
+        }
       });
     return () => {
-      alive = false;
+      active = false;
     };
   }, []);
 
-  const cam = cameras.find((c) => c.id === activeCameraId) ?? null;
-  const siblings = useMemo(() => (cam ? cameras.filter((c) => c.roadId === cam.roadId) : []), [cameras, cam]);
-  const index = cam ? siblings.findIndex((c) => c.id === cam.id) : -1;
-  const step = (delta: number) => {
-    if (siblings.length < 2 || index < 0) return;
-    openCamera(siblings[(index + delta + siblings.length) % siblings.length].id);
-  };
-
-  // Keyboard: Esc closes, arrows switch camera
   useEffect(() => {
     if (!activeCameraId) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') openCamera(null);
-      else if (e.key === 'ArrowRight') step(1);
-      else if (e.key === 'ArrowLeft') step(-1);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        if (document.fullscreenElement) void document.exitFullscreen();
+        openCamera(null);
+      } else if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+        const index = cameras.findIndex((item) => item.id === activeCameraId);
+        if (index < 0 || cameras.length < 2) return;
+        const direction = event.key === 'ArrowRight' ? 1 : -1;
+        const nextIndex = (index + direction + cameras.length) % cameras.length;
+        openCamera(cameras[nextIndex].id);
+      }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  });
+    const handleFullscreenChange = () => setFullscreen(document.fullscreenElement === overlayRef.current);
+    window.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, [activeCameraId, cameras, openCamera]);
+
+  useEffect(() => {
+    setFullscreen(document.fullscreenElement === overlayRef.current);
+  }, [activeCameraId]);
 
   if (!activeCameraId) return null;
 
-  const road = cam ? roads.find((r) => r.id === cam.roadId) ?? null : null;
-  const level = road ? predict(road, selectedTime, rain).nowLevel : null;
-  const live = cam !== null && hasLiveFeed(cam) && videoErrorFor !== cam.id;
+  const close = () => {
+    if (document.fullscreenElement) void document.exitFullscreen();
+    openCamera(null);
+  };
+
+  const toggleFullscreen = async () => {
+    setFullscreenMessage(null);
+    const overlay = overlayRef.current;
+    if (!overlay) return;
+    try {
+      if (document.fullscreenElement === overlay) {
+        await document.exitFullscreen();
+      } else if (document.fullscreenEnabled && typeof overlay.requestFullscreen === 'function') {
+        await overlay.requestFullscreen();
+      } else {
+        setFullscreenMessage("Full screen isn't available here. The camera view remains open in this window.");
+      }
+    } catch {
+      setFullscreenMessage("Full screen couldn't be started. The camera view remains open in this window.");
+    }
+  };
+
+  const showPrediction = () => {
+    if (!camera) return;
+    close();
+    selectRoad(camera.roadId);
+  };
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-      onClick={() => openCamera(null)}
+      ref={overlayRef}
       role="dialog"
       aria-modal="true"
-      aria-label={cam ? cam.name : 'Camera'}
+      aria-labelledby="camera-modal-title"
+      className="fixed inset-0 z-[100] bg-[#0b1220] text-[#f6f2ea]"
     >
-      <div
-        className="w-full max-w-2xl overflow-hidden rounded-2xl border border-white/10 bg-[#0b1220] text-slate-100 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-3">
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate font-semibold">{cam ? cam.name : 'Camera'}</h2>
-            <p className="flex items-center gap-1.5 truncate text-xs text-slate-400">
-              {cam?.roadName}
-              {level && (
-                <>
-                  <span>·</span>
-                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: LEVEL_COLOR[level] }} />
-                  {LEVEL_LABEL[level]} rush predicted
-                </>
-              )}
-            </p>
-          </div>
-          <span
-            className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
-              live ? 'border-[#30a46c]/50 bg-[#30a46c]/15 text-[#5fd497]' : 'border-white/15 bg-white/5 text-slate-300'
-            }`}
-          >
-            {live ? '● Live' : 'Access pending'}
-          </span>
-          <button
-            type="button"
-            onClick={() => openCamera(null)}
-            aria-label="Close"
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-slate-100"
-          >
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M6 6l12 12M18 6 6 18" />
-            </svg>
-          </button>
-        </div>
-
-        {/* View */}
-        <div className="relative aspect-video w-full bg-[#05080f]">
-          {live && cam ? (
-            <video
-              key={cam.id}
-              src={cam.videoSrc}
-              autoPlay
-              muted
-              playsInline
-              onError={() => setVideoErrorFor(cam.id)}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
-              {/* faint scan lines so the box reads as a camera screen */}
-              <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(0deg,rgba(255,255,255,0.025)_0px,rgba(255,255,255,0.025)_1px,transparent_1px,transparent_4px)]" />
-              <div className="grid h-14 w-14 place-items-center rounded-full border border-[#ffb547]/40 bg-[#ffb547]/10">
-                <svg viewBox="0 0 24 24" className="h-7 w-7 text-[#ffb547]" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                  <rect x="5" y="11" width="14" height="10" rx="2" />
-                  <path d="M8 11V8a4 4 0 0 1 8 0v3" />
-                </svg>
-              </div>
-              <p className="text-base font-semibold text-slate-100">Access not granted by Sindh Govt</p>
-              <p className="max-w-md text-xs leading-relaxed text-slate-400">
-                This is where the live view from this traffic camera will play. Raasta is ready to connect to the
-                Karachi Safe City camera network as soon as the Sindh Government grants access, so you can see
-                the road live from home before you leave.
-              </p>
-            </div>
-          )}
-
-          {siblings.length > 1 && (
-            <>
-              <button
-                type="button"
-                onClick={() => step(-1)}
-                aria-label="Previous camera on this road"
-                className="absolute left-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-black/50 text-white hover:bg-black/70"
-              >
-                ‹
-              </button>
-              <button
-                type="button"
-                onClick={() => step(1)}
-                aria-label="Next camera on this road"
-                className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-black/50 text-white hover:bg-black/70"
-              >
-                ›
-              </button>
-            </>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center gap-3 px-4 py-2">
-          <p className="min-w-0 flex-1 truncate text-[11px] text-slate-500">
-            {cam?.source ? `Location: ${cam.source} (approximate)` : 'Location approximate'}
-          </p>
-          {siblings.length > 1 && (
-            <p className="shrink-0 text-[11px] tabular-nums text-slate-400">
-              Camera {index + 1} of {siblings.length} on this road
-            </p>
-          )}
-        </div>
+      <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => void toggleFullscreen()}
+          className="raasta-button-secondary min-h-10 px-3 py-2 text-xs font-medium"
+        >
+          {fullscreen ? 'Exit full screen' : 'Enter full screen'}
+        </button>
+        <button
+          type="button"
+          onClick={close}
+          aria-label="Close camera view"
+          className="raasta-map-control"
+        >
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+            <path d="m6 6 12 12M18 6 6 18" />
+          </svg>
+        </button>
       </div>
+
+      <main className="raasta-scroll flex h-full min-h-0 flex-col items-center overflow-y-auto px-4 pb-4 pt-20 sm:px-8 sm:pt-24">
+        <div className="my-auto flex w-full max-w-5xl shrink-0 flex-col items-center gap-4 py-16">
+          <header className="w-full text-center">
+            <h2 id="camera-modal-title" className="truncate text-lg font-semibold sm:text-xl">
+              {camera?.name ?? (loadError ? 'Camera unavailable' : 'Traffic camera')}
+            </h2>
+            <p className="mt-1 truncate text-sm text-[#8f9bb8]">
+              {camera?.roadName || (camera ? 'Karachi' : loadError ? 'Camera details are unavailable.' : 'Loading camera details…')}
+            </p>
+          </header>
+
+          <div className="aspect-video max-h-[58dvh] min-h-[240px] w-full overflow-hidden rounded-xl border border-[#1f2a44] shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
+            <RestrictedCameraScreen className="h-full w-full" />
+          </div>
+
+          <section className="raasta-card w-full p-4 sm:p-5" aria-labelledby="restricted-feed-title">
+            <h3 id="restricted-feed-title" className="text-sm font-semibold text-[#f6f2ea]">
+              Live feed restricted
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-[#8f9bb8]">
+              {RESTRICTED_FEED_MESSAGE}
+            </p>
+            {camera && (
+              <p className="mt-2 text-xs tabular-nums text-[#8f9bb8]">
+                Map coordinates (m): {camera.position[0].toFixed(1)}, {camera.position[1].toFixed(1)}
+              </p>
+            )}
+            {loadError && <p className="mt-2 text-xs text-[#8f9bb8]">{loadError}</p>}
+            {fullscreenMessage && <p className="mt-2 text-xs text-[#8f9bb8]">{fullscreenMessage}</p>}
+            <button
+              type="button"
+              onClick={showPrediction}
+              disabled={!camera}
+              className="raasta-button-primary mt-4 px-4 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              See prediction for this road
+            </button>
+          </section>
+        </div>
+      </main>
     </div>
   );
 }

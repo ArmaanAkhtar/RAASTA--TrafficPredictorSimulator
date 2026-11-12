@@ -17,7 +17,7 @@ export interface RushProfiles {
 export const RUSH_PROFILES: RushProfiles = {
   byType: {
     // Generic roads are calmer than the named hotspots, so the map shows a mix of
-    // green / amber / red instead of everything turning red at rush hour.
+    // light / medium / heavy instead of everything turning red at rush hour.
     highway: [14, 10, 8, 7, 8, 12, 24, 44, 62, 66, 56, 50, 52, 55, 58, 62, 68, 76, 78, 70, 54, 40, 28, 20],
     arterial: [12, 8, 6, 5, 6, 11, 22, 40, 58, 62, 52, 48, 52, 56, 58, 57, 62, 72, 74, 64, 50, 36, 25, 17],
     local: [8, 5, 4, 3, 4, 8, 15, 30, 44, 48, 38, 35, 40, 44, 44, 40, 44, 54, 56, 48, 36, 26, 17, 12],

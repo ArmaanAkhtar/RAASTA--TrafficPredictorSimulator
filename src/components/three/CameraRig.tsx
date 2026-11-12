@@ -1,18 +1,26 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { Road } from '@/lib/types';
 import { useAppStore } from '@/store/useAppStore';
 import { useLocationStore } from '@/lib/location';
 import { useAreaStore } from '@/lib/area';
+import { projectLatLon } from '@/lib/projection';
 
 interface ControlsHandle {
   target: THREE.Vector3;
   enabled: boolean;
+  minDistance: number;
+  maxDistance: number;
+  maxPolarAngle: number;
   update: () => void;
+  addEventListener: (type: 'change', listener: () => void) => void;
+  removeEventListener: (type: 'change', listener: () => void) => void;
 }
+
+type MapControlAction = 'zoom-in' | 'zoom-out' | 'reset-view';
 
 /**
  * A camera flight. Instead of moving in a straight line (which looked jumpy), the camera
@@ -90,8 +98,7 @@ function framedView(
   const fovHalfRadians = THREE.MathUtils.degToRad(camera.fov * 0.5);
   const aspect = Math.max(camera.aspect, 0.1);
   const limitingHalfFov = Math.min(fovHalfRadians, Math.atan(Math.tan(fovHalfRadians) * aspect));
-  // Stay inside MapControls' maxDistance (42000), otherwise the controls snap the camera to an odd angle
-  const distance = THREE.MathUtils.clamp(radius / Math.max(Math.sin(limitingHalfFov), 0.1), 1200, 38000);
+  const distance = Math.max(1200, radius / Math.max(Math.sin(limitingHalfFov), 0.1));
   const direction = new THREE.Vector3(0.707, 0.707, -0.707).normalize();
   return { position: center.clone().add(direction.multiplyScalar(distance)), target: center };
 }
@@ -124,16 +131,57 @@ function offsetForPanel(view: { position: THREE.Vector3; target: THREE.Vector3 }
   view.position.add(offset);
 }
 
+function constrainCityView(
+  camera: THREE.PerspectiveCamera,
+  controls: ControlsHandle,
+  bounds: { center: THREE.Vector3; size: THREE.Vector3 },
+): () => void {
+  const margin = Math.max(2500, Math.max(bounds.size.x, bounds.size.z) * 0.06);
+  const fit = framedView(camera, bounds.center, bounds.size);
+  controls.minDistance = 1200;
+  controls.maxDistance = fit.position.distanceTo(bounds.center) * 1.05;
+  controls.maxPolarAngle = Math.PI / 2 - 0.05;
+
+  const clampTarget = () => {
+    const target = controls.target;
+    const x = THREE.MathUtils.clamp(
+      target.x,
+      bounds.center.x - bounds.size.x / 2 - margin,
+      bounds.center.x + bounds.size.x / 2 + margin,
+    );
+    const z = THREE.MathUtils.clamp(
+      target.z,
+      bounds.center.z - bounds.size.z / 2 - margin,
+      bounds.center.z + bounds.size.z / 2 + margin,
+    );
+    const dx = x - target.x;
+    const dy = -target.y;
+    const dz = z - target.z;
+    if (dx === 0 && dy === 0 && dz === 0) return;
+    target.set(x, 0, z);
+    camera.position.x += dx;
+    camera.position.y += dy;
+    camera.position.z += dz;
+  };
+
+  controls.addEventListener('change', clampTarget);
+  clampTarget();
+  return () => controls.removeEventListener('change', clampTarget);
+}
+
 export function CameraRig() {
   const camera = useThree((state) => state.camera) as THREE.PerspectiveCamera;
   const controls = useThree((state) => state.controls) as unknown as ControlsHandle | null;
   const roads = useAppStore((state) => state.roads);
+  const viewportSize = useThree((state) => state.size);
   const selectedRoadId = useAppStore((state) => state.selectedRoadId);
   const flyToken = useAppStore((state) => state.flyToken);
   const altRoute = useAppStore((state) => state.altRoute);
   const showRoute = useAppStore((state) => state.showRoute);
   const animation = useRef<AnimationState | null>(null);
+  const controlsRef = useRef<ControlsHandle | null>(null);
   const initialFrameDone = useRef(false);
+  const introZoomStarted = useRef(false);
   const lastToken = useRef(flyToken);
   const gl = useThree((state) => state.gl);
   const lastDoubleClick = useRef(0);
@@ -142,18 +190,111 @@ export function CameraRig() {
   const userPoint = useLocationStore((state) => state.point);
   const lastLocationToken = useRef(locationFlyToken);
   const areaFlyToken = useAreaStore((state) => state.flyToken);
-  const areaPlace = useAreaStore((state) => state.place);
+  const areaPlace = useAreaStore((state) => state.cameraPlace);
+  const placePanelOpen = useAreaStore((state) => state.place !== null);
   const lastAreaToken = useRef(areaFlyToken);
+  const cityBounds = useMemo(() => roadBoundingBox(roads), [roads]);
 
-  // A place picked in search: glide there, wide enough to see the cameras around it
+  useEffect(() => {
+    controlsRef.current = controls;
+    return () => {
+      controlsRef.current = null;
+    };
+  }, [controls]);
+
+  useEffect(() => {
+    if (!controls || roads.length === 0) return;
+    return constrainCityView(camera, controls, cityBounds);
+  }, [camera, cityBounds, controls, roads.length, viewportSize.height, viewportSize.width]);
+
+  useEffect(() => {
+    if (!controls || roads.length === 0) return;
+    const startIntroZoom = () => {
+      if (introZoomStarted.current) return;
+      introZoomStarted.current = true;
+
+      const [x, y] = projectLatLon(24.865, 67.035);
+      const target = new THREE.Vector3(x, 0, -y);
+      const overview = framedView(camera, cityBounds.center, cityBounds.size);
+      const distance = THREE.MathUtils.clamp(
+        overview.position.distanceTo(cityBounds.center) * 0.22,
+        6500,
+        8500,
+      );
+      const phi = THREE.MathUtils.degToRad(40);
+      const theta = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target)).theta;
+      const cameraOffset = new THREE.Vector3().setFromSpherical(
+        new THREE.Spherical(distance, phi, theta),
+      );
+
+      if (window.innerWidth < 768) {
+        const screenUp = new THREE.Vector3(
+          Math.cos(phi) * Math.sin(theta),
+          0,
+          Math.cos(phi) * Math.cos(theta),
+        );
+        target.addScaledVector(screenUp, -distance * 0.16);
+      }
+
+      const destination = target.clone().add(cameraOffset);
+      const flight = makeFlight(camera.position, controls.target, destination, target);
+      flight.duration = 2.2;
+      animation.current = flight;
+    };
+
+    window.addEventListener('raasta-intro-complete', startIntroZoom);
+    return () => window.removeEventListener('raasta-intro-complete', startIntroZoom);
+  }, [camera, cityBounds, controls, roads.length]);
+
+  useEffect(() => {
+    if (!controls) return;
+    const handleMapControl = (event: Event) => {
+      const action = (event as CustomEvent<MapControlAction>).detail;
+      const target = controls.target.clone();
+      if (action === 'reset-view') {
+        const view = framedView(camera, cityBounds.center, cityBounds.size);
+        animation.current = makeFlight(camera.position, target, view.position, view.target);
+        return;
+      }
+      if (action !== 'zoom-in' && action !== 'zoom-out') return;
+      const offset = camera.position.clone().sub(target);
+      const multiplier = action === 'zoom-in' ? 0.78 : 1 / 0.78;
+      const distance = THREE.MathUtils.clamp(
+        offset.length() * multiplier,
+        controls.minDistance,
+        controls.maxDistance,
+      );
+      animation.current = makeFlight(
+        camera.position,
+        target,
+        target.clone().add(offset.setLength(distance)),
+        target,
+      );
+    };
+
+    window.addEventListener('raasta-map-control', handleMapControl);
+    return () => window.removeEventListener('raasta-map-control', handleMapControl);
+  }, [camera, cityBounds, controls, roads.length]);
+
+  // Fit named areas to their boundary; points without a boundary get a close map view.
   useEffect(() => {
     if (areaFlyToken === lastAreaToken.current || !areaPlace) return;
     lastAreaToken.current = areaFlyToken;
-    const target = new THREE.Vector3(areaPlace.point[0], 0, -areaPlace.point[1]);
+    const [minX, minY, maxX, maxY] = areaPlace.bbox ?? [
+      areaPlace.point[0] - 1000,
+      areaPlace.point[1] - 750,
+      areaPlace.point[0] + 1000,
+      areaPlace.point[1] + 750,
+    ];
+    const box = {
+      center: new THREE.Vector3((minX + maxX) / 2, 0, -(minY + maxY) / 2),
+      size: new THREE.Vector3(Math.max(maxX - minX, 1000), 0, Math.max(maxY - minY, 1000)),
+    };
+    const view = framedView(camera, box.center, box.size);
+    if (placePanelOpen) offsetForPanel(view, box.size);
     const fromTarget = controls?.target ?? new THREE.Vector3();
-    const offset = camera.position.clone().sub(fromTarget).setLength(7000);
-    animation.current = makeFlight(camera.position, fromTarget, target.clone().add(offset), target);
-  }, [areaFlyToken, areaPlace, camera, controls]);
+    animation.current = makeFlight(camera.position, fromTarget, view.position, view.target);
+  }, [areaFlyToken, areaPlace, camera, controls, placePanelOpen]);
 
   // "My location": glide to the blue dot, close enough to see the nearby roads
   useEffect(() => {
@@ -277,8 +418,9 @@ export function CameraRig() {
   useFrame((_, delta) => {
     const flight = animation.current;
     if (!flight) return;
+    const activeControls = controlsRef.current;
     // Controls off while flying, so their damping does not fight the animation
-    if (controls) controls.enabled = false;
+    if (activeControls) activeControls.enabled = false;
     flight.elapsed += Math.min(delta, 1 / 30);
     const t = THREE.MathUtils.clamp(flight.elapsed / flight.duration, 0, 1);
     const e = easeInOutCubic(t);
@@ -289,15 +431,15 @@ export function CameraRig() {
     const theta = THREE.MathUtils.lerp(flight.fromSph.theta, flight.toSph.theta, e);
     camera.position.setFromSphericalCoords(radius, phi, theta).add(target);
 
-    if (controls) {
-      controls.target.copy(target);
-      controls.update();
+    if (activeControls) {
+      activeControls.target.copy(target);
+      activeControls.update();
     }
     camera.lookAt(target);
 
     if (t >= 1) {
       animation.current = null;
-      if (controls) controls.enabled = true;
+      if (activeControls) activeControls.enabled = true;
     }
   });
 

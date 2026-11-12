@@ -7,7 +7,7 @@ import { useRef } from 'react';
 import * as THREE from 'three';
 import { useLocationStore } from '@/lib/location';
 
-const BLUE = '#4da3ff';
+const BLUE = '#7cc4ff';
 
 /** Pulsing "you are here" dot with an accuracy halo. */
 export function UserLocation() {
@@ -59,7 +59,7 @@ export function UserLocation() {
       </mesh>
       </group>
       <Html center zIndexRange={[11, 0]} style={{ pointerEvents: 'none' }}>
-        <div className="-translate-y-6 whitespace-nowrap rounded-full border border-white/15 bg-[#0b1220]/90 px-2 py-0.5 text-[11px] font-semibold text-[#9cc9ff]">
+        <div className="-translate-y-6 whitespace-nowrap rounded-md border border-[#1f2a44] bg-[#0f1729]/92 px-2 py-0.5 text-[11px] font-semibold text-[#7cc4ff]">
           You are here
         </div>
       </Html>

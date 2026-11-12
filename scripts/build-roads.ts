@@ -10,6 +10,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
+import { projectLatLon } from './bbox';
 
 type Pt = [number, number];
 type RoadType = 'highway' | 'arterial' | 'local';
@@ -20,11 +21,6 @@ type RoadType = 'highway' | 'arterial' | 'local';
 const ROOT = process.cwd();
 const IN_FILE = path.join(ROOT, 'scripts', 'data', 'karachi_raw.geojson');
 const OUT_FILE = path.join(ROOT, 'public', 'data', 'roads.geojson');
-
-const LAT0 = 24.8607;
-const LON0 = 67.0011;
-const M_PER_DEG_LON = 111320 * Math.cos((LAT0 * Math.PI) / 180);
-const M_PER_DEG_LAT = 110540;
 
 const SIMPLIFY_TOLERANCE_M = 8;
 const MAX_FILE_BYTES = 3 * 1024 * 1024;
@@ -140,7 +136,7 @@ function slugify(name: string): string {
 const r1 = (n: number): number => Math.round(n * 10) / 10;
 
 function project([lon, lat]: Pt): Pt {
-  return [(lon - LON0) * M_PER_DEG_LON, (lat - LAT0) * M_PER_DEG_LAT];
+  return projectLatLon(lat, lon);
 }
 
 function dist(a: Pt, b: Pt): number {

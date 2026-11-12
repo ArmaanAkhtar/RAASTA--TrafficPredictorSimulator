@@ -52,7 +52,7 @@ for (const [a, b] of [['Gulshan-e-Iqbal', 'Clifton'], ['Clifton', 'Gulshan-e-Iqb
   console.log(`\n${a} -> ${b} (Wed 4 PM)`);
   for (const mode of ['time', 'petrol'] as const) {
     const s = performance.now();
-    const r = findTrip(roads, place(a), place(b), time, false, mode);
+    const r = findTrip(roads, place(a), place(b), time, mode);
     const ms = performance.now() - s;
     if (!r) { console.log(`  ${mode} no route`); continue; }
     const inner = r.path.slice(1, -1);
@@ -62,7 +62,7 @@ for (const [a, b] of [['Gulshan-e-Iqbal', 'Clifton'], ['Clifton', 'Gulshan-e-Iqb
 
 console.log('\nCar vs Bike vs Paidal, Gulshan-e-Iqbal -> Clifton (Wed 4 PM, Time save)');
 for (const vehicle of ['car', 'bike', 'walk'] as const) {
-  const r = findTrip(roads, place('Gulshan-e-Iqbal'), place('Clifton'), time, false, 'time', vehicle);
+  const r = findTrip(roads, place('Gulshan-e-Iqbal'), place('Clifton'), time, 'time', vehicle);
   console.log(`  ${vehicle.padEnd(5)} ${r ? `${r.distanceKm} km, ${r.minutes} min, ${r.fuelLitres.toFixed(2)} L` : 'no route'}`);
 }
 
@@ -71,7 +71,7 @@ for (const n of ['Shahrah-e-Faisal', 'University Road', 'M.A. Jinnah Road', 'Kor
   const road = roads.find((r) => r.name === n);
   if (!road) continue;
   const s = performance.now();
-  const r = findAltRoute(roads, road.id, time, false);
+  const r = findAltRoute(roads, road.id, time);
   const ms = performance.now() - s;
   console.log(`  ${n.padEnd(20)} ${r ? `${r.distanceKm} km, ${r.minutes} min, saves ${r.minutesSaved}, jam ${r.jamChance}%  via ${r.roadIds.slice(0, 3).map((id) => nameOf.get(id)).join(' -> ')}` : 'no alternative'}  [${ms.toFixed(0)} ms]`);
 }

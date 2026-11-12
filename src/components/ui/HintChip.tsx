@@ -55,14 +55,14 @@ export default function HintChip() {
     <div className="pointer-events-none fixed inset-x-0 bottom-6 z-20 flex justify-center px-4">
       <div
         role="status"
-        className="pointer-events-auto flex items-center gap-3 rounded-full border border-[#ffb547]/30 bg-[#0b1220]/85 py-2 pl-3 pr-2 text-sm text-slate-200 shadow-xl backdrop-blur-md"
+        className="raasta-panel pointer-events-auto flex items-center gap-3 px-3 py-2 text-sm text-slate-200"
       >
         <span className="relative flex h-2.5 w-2.5 shrink-0">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#ffb547] opacity-60" />
-          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#ffb547]" />
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#7cc4ff] opacity-40" />
+          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#7cc4ff]" />
         </span>
         <span>
-          <span className="font-semibold text-[#ffb547]">{touch ? 'Tap' : 'Click'} any road</span>
+          <span className="font-semibold text-[#7cc4ff]">{touch ? 'Tap' : 'Click'} any road</span>
           <span className="hidden sm:inline"> to see its rush, jam chance and a better route</span>
           <span className="sm:hidden"> to see details</span>
         </span>
@@ -70,9 +70,9 @@ export default function HintChip() {
           type="button"
           onClick={dismiss}
           aria-label="Dismiss hint"
-          className="rounded-full p-1 text-slate-400 hover:bg-white/10 hover:text-slate-100"
+          className="rounded-md p-1 text-slate-400 hover:bg-white/5 hover:text-slate-100"
         >
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5">
             <path d="M6 6l12 12M18 6 6 18" />
           </svg>
         </button>

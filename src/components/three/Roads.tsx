@@ -9,7 +9,7 @@ import type { Road, RushLevel } from '@/lib/types';
 import { useAppStore } from '@/store/useAppStore';
 import { usePredictions } from './usePredictions';
 import { useDaylight, type DaylightState } from './useDaylight';
-import { useSettledTimeAndRain, viewDistance } from './usePerformance';
+import { useSettledTime, viewDistance } from './usePerformance';
 
 const VISUAL_WIDTH_SCALE = 4;
 /** A click only selects a road if the pointer moved less than this between down and up. */
@@ -21,6 +21,12 @@ const ROAD_WIDTH: Record<Road['type'], number> = {
   highway: 40 * VISUAL_WIDTH_SCALE,
   arterial: 24 * VISUAL_WIDTH_SCALE,
   local: 14 * VISUAL_WIDTH_SCALE,
+};
+
+const RUSH_BADGE_STYLE: Record<RushLevel, { backgroundColor: string; color: string }> = {
+  light: { backgroundColor: '#30a46c', color: '#ffffff' },
+  medium: { backgroundColor: '#f5a524', color: '#0b1220' },
+  heavy: { backgroundColor: '#e5484d', color: '#ffffff' },
 };
 
 /**
@@ -189,7 +195,7 @@ const RoadRibbon = memo(function RoadRibbon({
   const groupRef = useRef<THREE.Group>(null);
   const baseMaterials = useRef<THREE.MeshBasicMaterial[]>([]);
   const coreMaterials = useRef<THREE.MeshBasicMaterial[]>([]);
-  const amberMaterials = useRef<THREE.MeshBasicMaterial[]>([]);
+  const selectionMaterials = useRef<THREE.MeshBasicMaterial[]>([]);
   const glowMesh = useRef<THREE.Mesh>(null);
   const selectionOpacity = useRef(1);
 
@@ -242,12 +248,12 @@ const RoadRibbon = memo(function RoadRibbon({
     coreMaterials.current.forEach((material) => {
       material.opacity = THREE.MathUtils.damp(material.opacity, selectionOpacity.current * stripOpacity, 7, delta);
     });
-    // Selection glow in the road's rush colour (red heavy / amber medium / green light), breathing
+    // Selection glow in the road's rush colour (red heavy / medium / green light), breathing
     const glowTarget = selected && visible ? (level === 'heavy' ? 0.55 + Math.sin(t * 3) * 0.2 : 0.55) : 0;
-    amberMaterials.current.forEach((material) => {
+    selectionMaterials.current.forEach((material) => {
       material.opacity = THREE.MathUtils.damp(material.opacity, glowTarget, 7, delta);
     });
-    if (glowMesh.current) glowMesh.current.visible = (amberMaterials.current[0]?.opacity ?? 0) > 0.01;
+    if (glowMesh.current) glowMesh.current.visible = (selectionMaterials.current[0]?.opacity ?? 0) > 0.01;
   });
 
   // The click/hover mesh is the full-width ribbon; when zoomed in the road is drawn narrower, so only
@@ -305,7 +311,7 @@ const RoadRibbon = memo(function RoadRibbon({
           <mesh geometry={ribbon.glow} ref={glowMesh} renderOrder={-1}>
             <meshBasicMaterial
               ref={(material: THREE.MeshBasicMaterial | null) => {
-                if (material) amberMaterials.current[0] = material;
+                if (material) selectionMaterials.current[0] = material;
               }}
               onBeforeCompile={scaleWidthWithZoom}
               color={baseColor}
@@ -353,7 +359,7 @@ const RoadRibbon = memo(function RoadRibbon({
                 if (material) coreMaterials.current[0] = material;
               }}
               onBeforeCompile={scaleWidthWithZoom}
-              color={showHover ? '#ffb547' : baseColor}
+              color={showHover ? '#7cc4ff' : baseColor}
               fog={false}
               toneMapped={false}
               transparent
@@ -370,7 +376,7 @@ const RoadRibbon = memo(function RoadRibbon({
           position={[hoverPoint[0], 120 - roadHeight, hoverPoint[1]]}
           style={{ pointerEvents: 'none' }}
         >
-          <div style={{ transform: 'translate(14px, 14px)', background: 'rgba(11,18,32,.92)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 8, color: 'white', padding: '6px 10px', fontSize: 12, whiteSpace: 'nowrap', boxShadow: '0 8px 24px rgba(0,0,0,.35)' }}>
+          <div style={{ transform: 'translate(14px, 14px)', background: 'rgba(15,23,41,.92)', border: '1px solid #1f2a44', borderRadius: 8, color: '#f6f2ea', padding: '6px 10px', fontSize: 12, whiteSpace: 'nowrap', boxShadow: '0 12px 32px rgba(0,0,0,.24)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
               <span style={{ width: 8, height: 8, borderRadius: 999, background: baseColor, display: 'inline-block' }} />
               {road.name}
@@ -383,14 +389,14 @@ const RoadRibbon = memo(function RoadRibbon({
         <Html
           position={[road.center[0], 180, -road.center[1]]}
           center
-          distanceFactor={2200}
+          zIndexRange={[60, 0]}
           style={{ pointerEvents: 'none' }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
-            <span style={{ background: 'rgba(11,18,32,.92)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 6, color: 'white', padding: '4px 8px', fontSize: 12, fontWeight: 600 }}>
+            <span style={{ background: '#0f1729', border: '1px solid #1f2a44', borderRadius: 8, color: '#f6f2ea', padding: '7px 10px', fontSize: 15, fontWeight: 600 }}>
               {road.name}
             </span>
-            <span style={{ background: LEVEL_COLOR[level], borderRadius: 999, color: '#0b1220', padding: '4px 8px', fontSize: 11, fontWeight: 800, textTransform: 'uppercase' }}>
+            <span style={{ ...RUSH_BADGE_STYLE[level], borderRadius: 8, padding: '5px 8px', fontSize: 12, fontWeight: 700, textTransform: 'uppercase' }}>
               {level}
             </span>
           </div>
@@ -403,8 +409,8 @@ const RoadRibbon = memo(function RoadRibbon({
 export function Roads() {
   const roads = useAppStore((state) => state.roads);
   // Short delay so colours follow the slider without re-rendering the city on every step
-  const { time: selectedTime, rain } = useSettledTimeAndRain(120);
-  const predictions = usePredictions(roads, selectedTime, rain);
+  const selectedTime = useSettledTime(120);
+  const predictions = usePredictions(roads, selectedTime);
   const daylight = useDaylight();
   const hd = true; // single quality: pulsing rush glow for everyone
   const controls = useThree((s) => s.controls);

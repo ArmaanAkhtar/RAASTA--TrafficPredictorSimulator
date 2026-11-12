@@ -195,7 +195,6 @@ function findAltRouteGeometric(
   roads: Road[],
   roadId: string,
   t: SelectedTime,
-  rain: boolean,
 ): RouteResult | null {
   const road = roads.find((r) => r.id === roadId);
   if (!road) return null;
@@ -263,7 +262,7 @@ function findAltRouteGeometric(
     if (hit) return hit;
     const r = roadById.get(rid);
     if (!r) return null;
-    const p = predict(r, t, rain);
+    const p = predict(r, t);
     preds.set(rid, p);
     return p;
   };
@@ -369,7 +368,6 @@ function findTripGeometric(
   from: Pt,
   to: Pt,
   t: SelectedTime,
-  rain: boolean,
   mode: TripMode,
   vehicle: Vehicle = 'car',
 ): TripResult | null {
@@ -386,7 +384,7 @@ function findTripGeometric(
     if (hit) return hit;
     const r = roadById.get(rid);
     if (!r) return null;
-    const p = predict(r, t, rain);
+    const p = predict(r, t);
     preds.set(rid, p);
     return p;
   };
@@ -439,9 +437,9 @@ function findTripGeometric(
 // ===========================================================================
 
 /** Better route around a busy road. Same contract as before. */
-export function findAltRoute(roads: Road[], roadId: string, t: SelectedTime, rain: boolean): RouteResult | null {
+export function findAltRoute(roads: Road[], roadId: string, t: SelectedTime): RouteResult | null {
   const dg = getDirectedGraph();
-  return dg ? findAltRouteDirected(dg, roads, roadId, t, rain) : findAltRouteGeometric(roads, roadId, t, rain);
+  return dg ? findAltRouteDirected(dg, roads, roadId, t) : findAltRouteGeometric(roads, roadId, t);
 }
 
 /** From -> To with a goal (Time save / Petrol save) and a way of travelling (car, bike, on foot). */
@@ -450,18 +448,17 @@ export function findTrip(
   from: Pt,
   to: Pt,
   t: SelectedTime,
-  rain: boolean,
   mode: TripMode,
   vehicle: Vehicle = 'car',
 ): TripResult | null {
   const dg = getDirectedGraph();
-  if (!dg) return findTripGeometric(roads, from, to, t, rain, mode, vehicle);
+  if (!dg) return findTripGeometric(roads, from, to, t, mode, vehicle);
   // On foot one-way rules do not apply: walk either way along any carriageway
-  return findTripDirected(vehicle === 'walk' ? walkingGraph(dg) : dg, roads, from, to, t, rain, mode, vehicle);
+  return findTripDirected(vehicle === 'walk' ? walkingGraph(dg) : dg, roads, from, to, t, mode, vehicle);
 }
 
 /** Predictions per display road (and per road class for unnamed links / connectors), cached per call. */
-function makeScorer(roads: Road[], t: SelectedTime, rain: boolean) {
+function makeScorer(roads: Road[], t: SelectedTime) {
   const roadById = new Map<string, Road>(roads.map((r) => [r.id, r]));
   const cache = new Map<string, Prediction>();
   const pseudo = (type: Road['type']): Road => ({ id: `__${type}`, name: '', type, segments: [], lengthM: 0, center: [0, 0] });
@@ -470,7 +467,7 @@ function makeScorer(roads: Road[], t: SelectedTime, rain: boolean) {
     let p = cache.get(key);
     if (!p) {
       const road = e.roadId ? roadById.get(e.roadId) : undefined;
-      p = predict(road ?? pseudo(e.type), t, rain);
+      p = predict(road ?? pseudo(e.type), t);
       cache.set(key, p);
     }
     return p;
@@ -747,7 +744,6 @@ function findTripDirected(
   from: Pt,
   to: Pt,
   t: SelectedTime,
-  rain: boolean,
   mode: TripMode,
   vehicle: Vehicle = 'car',
 ): TripResult | null {
@@ -766,7 +762,7 @@ function findTripDirected(
     return near[n] === 1;
   };
   const allow = (e: DEdge) => baseAllow(e) && (!e.street || nearEnd(e.from) || nearEnd(e.to));
-  const scorer = makeScorer(roads, t, rain);
+  const scorer = makeScorer(roads, t);
   // Walking: same speed everywhere, so the quickest walk is simply the shortest one
   const cost =
     mode === 'time' || vehicle === 'walk'
@@ -808,7 +804,6 @@ function findAltRouteDirected(
   roads: Road[],
   roadId: string,
   t: SelectedTime,
-  rain: boolean,
 ): RouteResult | null {
   // Nodes on the selected road (main network only)
   const onRoad = new Set<number>();
@@ -838,7 +833,7 @@ function findAltRouteDirected(
   }
   if (a < 0 || far < MIN_ROUTE_M) return null;
 
-  const scorer = makeScorer(roads, t, rain);
+  const scorer = makeScorer(roads, t);
   // Better routes stay on real roads (no galiyan), and off the busy road itself
   const notRoad = (e: DEdge) => e.roadId !== roadId && !e.street;
   const timeCost = (e: DEdge) => e.len * (1 + scorer.score(e) / 50);
@@ -876,7 +871,7 @@ function findAltRouteDirected(
   const onlyRoad = dijkstraDirected(g, s, e2, (e) => e.roadId === roadId, (e) => e.len);
   const ownLen = onlyRoad ? onlyRoad.edges.reduce((acc, e) => acc + e.len, 0) : far * 1.3;
   const road = roads.find((r) => r.id === roadId);
-  const ownScore = road ? predict(road, t, rain).nowScore : 60;
+  const ownScore = road ? predict(road, t).nowScore : 60;
   const ownMinutes = minutesFor(ownLen, ownScore);
 
   return {

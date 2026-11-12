@@ -5,18 +5,24 @@
 // One draw call: each street segment is one instance of a small quad, widened in the shader so it is
 // ~7 m wide up close and never thinner than ~1 pixel far away (no flicker when zoomed out).
 import { useFrame, useThree } from '@react-three/fiber';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useDaylight } from './useDaylight';
+import { viewDistance } from './usePerformance';
 
 const STREET_Y = 0.8; // above the ground and grid, below every road ribbon (local roads start at 2)
 const HALF_WIDTH_M = 3.5;
 const MIN_PIXELS = 1.1; // never thinner than this on screen
+const MAX_STREET_DISTANCE = 28000;
 const WHITE = new THREE.Color('#ffffff');
+const FILE_MAGIC = 0x53545232;
 
 /** streets.bin -> per-segment [x0, y0, x1, y1] (local metres) */
 function decode(buffer: ArrayBuffer): Float32Array {
-  const data = new Int16Array(buffer);
+  const isExpandedFormat = buffer.byteLength >= 4 && new DataView(buffer).getInt32(0, true) === FILE_MAGIC;
+  const data: ArrayLike<number> = isExpandedFormat
+    ? new Int32Array(buffer, 4)
+    : new Int16Array(buffer);
   let segments = 0;
   for (let i = 0; i < data.length; ) {
     const n = data[i];
@@ -93,6 +99,9 @@ export function Streets() {
   const [segments, setSegments] = useState<Float32Array | null>(null);
   const daylight = useDaylight();
   const gl = useThree((s) => s.gl);
+  const controls = useThree((s) => s.controls);
+  const mesh = useRef<THREE.Mesh>(null);
+  const materialRef = useRef<THREE.ShaderMaterial | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -144,10 +153,19 @@ export function Streets() {
     [],
   );
 
-  useEffect(() => () => material.dispose(), [material]);
+  useEffect(() => {
+    materialRef.current = material;
+    return () => {
+      materialRef.current = null;
+      material.dispose();
+    };
+  }, [material]);
 
   useFrame(({ camera }) => {
-    const u = material.uniforms;
+    if (mesh.current) mesh.current.visible = viewDistance(camera, controls) < MAX_STREET_DISTANCE;
+    const activeMaterial = materialRef.current;
+    if (!activeMaterial) return;
+    const u = activeMaterial.uniforms;
     // one screen pixel in world metres per metre of distance, times the minimum width (half on each side)
     const fov = camera instanceof THREE.PerspectiveCamera ? camera.fov : 45;
     const pxPerUnit = (2 * Math.tan(THREE.MathUtils.degToRad(fov) / 2)) / Math.max(1, gl.domElement.height);
@@ -158,5 +176,5 @@ export function Streets() {
   });
 
   if (!geometry) return null;
-  return <mesh geometry={geometry} material={material} frustumCulled={false} raycast={() => null} renderOrder={-2} />;
+  return <mesh ref={mesh} geometry={geometry} material={material} frustumCulled={false} raycast={() => null} renderOrder={-2} />;
 }

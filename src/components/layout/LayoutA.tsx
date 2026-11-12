@@ -8,7 +8,6 @@ import DemoButton from '@/components/ui/DemoButton';
 import FilterBar from '@/components/ui/FilterBar';
 import HintChip from '@/components/ui/HintChip';
 import IntroOverlay from '@/components/ui/IntroOverlay';
-import Legend from '@/components/ui/Legend';
 import SearchBar from '@/components/ui/SearchBar';
 import SidePanel from '@/components/ui/SidePanel';
 import TimePicker from '@/components/ui/TimePicker';
@@ -20,56 +19,65 @@ import LocateButton from './LocateButton';
 import { useAppStore } from '@/store/useAppStore';
 import { useTripPanelVisible } from '@/lib/trip';
 import TimeChip from './TimeChip';
+import MobileExperience from './MobileExperience';
+import { useMobileViewport } from './useMobileViewport';
+import MapControlStack from './MapControlStack';
 
 export default function LayoutA() {
+  const isMobile = useMobileViewport();
+  return isMobile ? <MobileExperience /> : <DesktopLayoutA />;
+}
+
+function DesktopLayoutA() {
   const roadPicked = useAppStore((state) => state.selectedRoadId !== null);
   const tripPanel = useTripPanelVisible();
   const areaPanel = useAreaPanelVisible();
-  // A right panel (road, place or trip) is open: on phones it is a bottom sheet, so slim down the top column
+  // A selected result takes the mobile bottom sheet; keep the map controls compact above it.
   const roadSelected = roadPicked || tripPanel || areaPanel;
   const [timeOpen, setTimeOpen] = useState(false); // mobile only; desktop always shows the TimePicker
 
-  // On phones the SidePanel is a bottom sheet: keep only brand + search on top so they never collide
-  const hideOnPhoneWhenSelected = roadSelected ? 'hidden md:flex' : 'flex';
-
   return (
     <>
-      <div className="pointer-events-none absolute inset-0 z-20">
-        <div className="pointer-events-auto absolute left-3 right-3 top-3 flex flex-col gap-3 sm:left-4 sm:right-auto sm:top-4 sm:w-[360px]">
-          <div className="flex items-baseline gap-2 px-1">
-            <Image src="/raasta_logo_header.svg" width={119} height={28} alt="Raasta" className="h-6 w-auto md:h-7" />
-            <p className="truncate text-xs text-slate-400">Know the rush before you leave</p>
+      <div className="pointer-events-none absolute inset-0 z-40">
+        <div className={`raasta-scroll pointer-events-auto absolute left-2 right-2 top-2 flex max-h-[calc(100dvh-1rem)] flex-col gap-2 overflow-visible sm:left-4 sm:right-auto sm:top-4 md:max-h-[calc(100dvh-2rem)] md:w-[360px] md:overflow-y-auto md:overscroll-contain md:pr-1 lg:w-max ${
+          roadSelected ? 'lg:max-w-[calc(100vw-428px)]' : 'lg:max-w-[calc(100vw-2rem)]'
+        }`}>
+          <div className="flex items-center gap-2 md:flex-col md:items-start">
+            <div className="raasta-panel flex w-[128px] shrink-0 flex-col items-start gap-0.5 px-2 py-1.5 md:w-[360px] md:gap-1 md:px-4 md:py-2">
+              <Image src="/raasta_logo_header.svg" width={170} height={40} alt="Raasta" className="h-7 w-auto md:h-8" />
+              <p className="hidden max-w-[120px] text-[8px] leading-tight uppercase tracking-[0.1em] text-[#f6f2ea]/70 min-[390px]:block md:max-w-none md:text-[11px] md:tracking-[0.12em]">Know the rush before you leave</p>
+            </div>
+            <div className="flex min-w-0 flex-1 items-center gap-2 md:w-max md:flex-none">
+              <div className="min-w-0 flex-1 md:w-[360px] md:flex-none">
+                <SearchBar />
+              </div>
+            </div>
           </div>
 
-          <SearchBar />
-
-          {/* Phone: compact time chip that opens the full picker */}
-          <div className={roadSelected ? 'hidden' : 'flex md:hidden'}>
+          <div className="raasta-mobile-time-row flex items-center gap-2 md:hidden">
             <TimeChip open={timeOpen} onToggle={() => setTimeOpen((v) => !v)} />
           </div>
-          <div className={`${timeOpen && !roadSelected ? 'block' : 'hidden'} md:block`}>
+          <div className={`${timeOpen ? 'block' : 'hidden'} md:hidden`}>
+            <TimePicker />
+          </div>
+          <div className="hidden md:block md:w-[360px]">
             <TimePicker />
           </div>
 
-          {/* Plan a trip (From -> To, Time save / Petrol save), right under the time */}
-          <div className={roadPicked ? 'hidden md:block' : 'block'}>
-            <TripPlanner />
+          <div className={roadSelected ? 'hidden md:block md:w-[360px]' : 'block md:w-[360px]'}>
+            <TripPlanner mobileSheetActive={!roadSelected} />
           </div>
 
-          <div className={`${hideOnPhoneWhenSelected} flex-wrap items-center gap-2`}>
+          <div className="hidden md:block md:w-[360px]">
             <FilterBar />
-          </div>
-          <div className={`${hideOnPhoneWhenSelected} flex-wrap items-center gap-2`}>
-            <DemoButton />
-          </div>
-          <div className={`${hideOnPhoneWhenSelected} items-start`}>
-            <LocateButton />
           </div>
         </div>
 
-        {/* Legend only where there is room next to the bottom-centre hint */}
-        <div className="pointer-events-auto absolute bottom-4 left-4 hidden lg:[@media(min-height:900px)]:block">
-          <Legend />
+        <MapControlStack panelOpen={roadSelected} />
+
+        <div className="raasta-mobile-floats pointer-events-auto fixed right-3 bottom-[calc(25dvh+0.75rem+env(safe-area-inset-bottom))] z-30 flex flex-col items-end gap-2 md:hidden">
+          <div className="raasta-mobile-demo"><DemoButton /></div>
+          <LocateButton />
         </div>
       </div>
 
